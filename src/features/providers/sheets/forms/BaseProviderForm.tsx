@@ -106,7 +106,10 @@ function buildInitialForm(
         brand === 'interactions'
           ? ''
           : undefined,
-      apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
+      apiKeyEntries:
+        brand === 'openaiCompatibility' || brand === 'codex'
+          ? [emptyApiKeyEntry()]
+          : undefined,
     };
   }
 
@@ -203,7 +206,19 @@ function buildInitialForm(
       brand === 'gemini' ||
       brand === 'interactions'
         ? ''
+        : undefined,    apiKeyEntries:
+      brand === 'codex'
+        ? cfg.apiKeyEntries?.length
+          ? cfg.apiKeyEntries.map((entry) => ({
+              apiKey: '',
+              existingApiKey: entry.apiKey,
+              proxyUrl: entry.proxyUrl ?? '',
+              weight: entry.weight,
+              authIndex: entry.authIndex,
+            }))
+          : [emptyApiKeyEntry()]
         : undefined,
+
   };
 }
 
@@ -393,17 +408,25 @@ export function BaseProviderForm({
     if (descriptor.supportsName && !form.name.trim()) {
       return t('providersPage.form.validation.nameRequired');
     }
-    if (descriptor.supportsApiKey && mode === 'create' && !form.apiKey.trim()) {
+    if (
+      descriptor.supportsApiKey &&
+      mode === 'create' &&
+      !form.apiKey.trim() &&
+      !(
+        descriptor.supportsApiKeyEntries &&
+        (form.apiKeyEntries ?? []).some((entry) => entry.apiKey.trim())
+      )
+    ) {
       return t('providersPage.form.validation.apiKeyRequired');
     }
     if (descriptor.baseUrlRequired && !form.baseUrl.trim()) {
       return t('providersPage.form.validation.baseUrlRequired');
     }
+    const supportsBundledEntries =
+      brand === 'openaiCompatibility' || brand === 'codex';
     const weights = [
-      ...(brand === 'openaiCompatibility'
-        ? (form.apiKeyEntries ?? []).map((entry) => entry.weight)
-        : []),
-      ...(brand !== 'openaiCompatibility' ? [form.weight] : []),
+      ...(supportsBundledEntries ? (form.apiKeyEntries ?? []).map((entry) => entry.weight) : []),
+      ...(!supportsBundledEntries ? [form.weight] : []),
     ];
     if (weights.some((weight) => weight !== undefined && !Number.isSafeInteger(weight))) {
       return t('providersPage.form.validation.weightInteger');

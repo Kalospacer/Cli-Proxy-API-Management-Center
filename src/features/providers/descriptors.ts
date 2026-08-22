@@ -76,7 +76,7 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsTestModel: true,
     supportsWebsockets: true,
     supportsCloak: false,
-    supportsApiKeyEntries: false,
+    supportsApiKeyEntries: true,
     sheetSize: 'md',
   },
   xai: {

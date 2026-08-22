@@ -83,6 +83,8 @@ function providerKeyToResource(
   index: number
 ): ProviderResource {
   const apiKey = config.apiKey ?? '';
+  const bundledEntries = (config as ProviderKeyConfig).apiKeyEntries;
+  const firstBundledKey = bundledEntries?.find((entry) => entry.apiKey?.trim())?.apiKey ?? '';
   const disabled = hasDisableAllModelsRule(config.excludedModels);
   const flags: ProviderResource['flags'] = {};
   if (brand === 'codex' || brand === 'xai') {
@@ -101,12 +103,20 @@ function providerKeyToResource(
   } as ProviderResourceSelector;
 
   return {
-    id: buildId(brand, index, truncateForId(apiKey)),
+    id: buildId(brand, index, truncateForId(apiKey || firstBundledKey)),
     brand,
     originalIndex: index,
     name: null,
-    identifier: maskApiKey(apiKey) || `#${index + 1}`,
-    apiKeyPreview: apiKey ? maskApiKey(apiKey) : null,
+    identifier:
+      maskApiKey(apiKey) ||
+      (firstBundledKey
+        ? `${maskApiKey(firstBundledKey)}${(bundledEntries?.length ?? 0) > 1 ? ` +${(bundledEntries?.length ?? 0) - 1}` : ''}`
+        : `#${index + 1}`),
+    apiKeyPreview: apiKey
+      ? maskApiKey(apiKey)
+      : firstBundledKey
+        ? maskApiKey(firstBundledKey)
+        : null,
     apiKey: apiKey || null,
     authIndex: config.authIndex ?? null,
     baseUrl: config.baseUrl ?? null,
@@ -117,7 +127,7 @@ function providerKeyToResource(
     priority: normalizePriority(config.priority),
     headerCount: countHeaders(config.headers),
     excludedModelCount: stripDisableAllModelsRule(config.excludedModels).length,
-    apiKeyEntryCount: 0,
+    apiKeyEntryCount: bundledEntries?.length ?? 0,
     disabled,
     flags,
     selector,

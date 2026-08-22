@@ -200,6 +200,23 @@ const buildProviderKeyConfig = (
   if ((brand === 'codex' || brand === 'xai') && input.websockets !== undefined) {
     next.websockets = input.websockets;
   }
+  if (brand === 'codex' || brand === 'xai') {
+    const existingEntries = (existing as ProviderKeyConfig | undefined)?.apiKeyEntries;
+    const entries =
+      input.apiKeyEntries
+        ?.map((entry, index) => {
+          const fallbackApiKey =
+            entry.existingApiKey?.trim() || existingEntries?.[index]?.apiKey?.trim() || '';
+          return {
+            apiKey: entry.apiKey.trim() || fallbackApiKey,
+            proxyUrl: entry.proxyUrl.trim() || undefined,
+            weight: entry.weight,
+            authIndex: entry.authIndex?.trim() || undefined,
+          };
+        })
+        .filter((entry) => entry.apiKey) ?? [];
+    if (entries.length) next.apiKeyEntries = entries;
+  }
   if (brand === 'claude' && input.cloak) {
     next.cloak = {
       mode: input.cloak.mode.trim() || undefined,
@@ -855,11 +872,11 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           const next = (config?.interactionsApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('interactions-api-key', next);
         } else if (sel.brand === 'codex') {
-          await providersApi.deleteCodexConfig(sel.apiKey, sel.baseUrl);
+          await providersApi.deleteCodexConfig(sel.apiKey, sel.baseUrl, sel.index);
           const next = (config?.codexApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('codex-api-key', next);
         } else if (sel.brand === 'xai') {
-          await providersApi.deleteXAIConfig(sel.apiKey, sel.baseUrl);
+          await providersApi.deleteXAIConfig(sel.apiKey, sel.baseUrl, sel.index);
           const next = (config?.xaiApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('xai-api-key', next);
         } else if (sel.brand === 'claude') {

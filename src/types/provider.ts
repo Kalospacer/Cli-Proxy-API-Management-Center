@@ -42,6 +42,8 @@ export interface GeminiKeyConfig {
 
 export interface ProviderKeyConfig {
   apiKey: string;
+  /** Bundled keys sharing this entry's settings (codex/xai api-key-entries). */
+  apiKeyEntries?: ApiKeyEntry[];
   priority?: number;
   weight?: number;
   prefix?: string;

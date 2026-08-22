@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/ui/Collapsible';
 import { IconCheck, IconX } from '@/components/ui/icons';
 import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
-import type { OpenAIProviderConfig } from '@/types';
+import type {  ProviderKeyConfig,
+ OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
 import {
   getSponsorProviderDefinition,
@@ -118,7 +119,9 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
 
   const openaiConfig =
     resource.brand === 'openaiCompatibility' ? (resource.raw as OpenAIProviderConfig) : null;
-  const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
+  const codexConfig =
+    resource.brand === 'codex' ? (resource.raw as ProviderKeyConfig) : null;
+  const apiKeyEntries = openaiConfig?.apiKeyEntries ?? codexConfig?.apiKeyEntries ?? [];
 
   return (
     <div>
@@ -135,21 +138,22 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
         ))}
       </dl>
 
-      {openaiConfig && apiKeyEntries.length > 0 ? (
+      {(openaiConfig || codexConfig) && apiKeyEntries.length > 0 ? (
         <div className={styles.apiKeyEntriesSection}>
           <div className={styles.apiKeyEntriesLabel}>
             {t('providersPage.form.apiKeyEntriesSection')}: {apiKeyEntries.length}
           </div>
           <div className={styles.apiKeyEntryList}>
             {apiKeyEntries.map((entry, entryIndex) => {
-              const entryStats = usageByProvider
-                ? getProviderTotalStats(
-                    usageByProvider,
-                    openaiConfig.name,
-                    entry.apiKey,
-                    openaiConfig.baseUrl
-                  )
-                : { success: 0, failure: 0 };
+              const entryStats =
+                usageByProvider && openaiConfig
+                  ? getProviderTotalStats(
+                      usageByProvider,
+                      openaiConfig.name,
+                      entry.apiKey,
+                      openaiConfig.baseUrl
+                    )
+                  : { success: 0, failure: 0 };
               return (
                 <div key={`${entry.apiKey}-${entryIndex}`} className={styles.apiKeyEntryCard}>
                   <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>

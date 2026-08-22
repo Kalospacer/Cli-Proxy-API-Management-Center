@@ -127,9 +127,15 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
   const record = isRecord(item) ? item : null;
   const apiKey = record?.['api-key'] ?? (typeof item === 'string' ? item : '');
   const trimmed = String(apiKey || '').trim();
-  if (!trimmed) return null;
+  const bundledEntries = Array.isArray(record?.['api-key-entries'])
+    ? ((record['api-key-entries'] as unknown[])
+        .map((entry) => normalizeApiKeyEntry(entry))
+        .filter(Boolean) as ApiKeyEntry[])
+    : [];
+  if (!trimmed && bundledEntries.length === 0) return null;
 
   const config: ProviderKeyConfig = { apiKey: trimmed };
+  if (!trimmed && bundledEntries.length) config.apiKeyEntries = bundledEntries;
   const weight = readCredentialWeight(record?.weight);
   if (weight !== undefined) config.weight = weight;
   const priority = record?.priority;

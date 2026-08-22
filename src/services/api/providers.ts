@@ -33,7 +33,7 @@ const PROVIDER_COMMON_KEY_FIELDS = [
 
 const GEMINI_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
 const INTERACTIONS_KEY_FIELDS = PROVIDER_COMMON_KEY_FIELDS;
-const CODEX_KEY_FIELDS = [...PROVIDER_COMMON_KEY_FIELDS, 'websockets'] as const;
+const CODEX_KEY_FIELDS = ['api-key-entries', ...PROVIDER_COMMON_KEY_FIELDS, 'websockets'] as const;
 const XAI_KEY_FIELDS = CODEX_KEY_FIELDS;
 const CLAUDE_KEY_FIELDS = [
   ...PROVIDER_COMMON_KEY_FIELDS,
@@ -245,6 +245,16 @@ const mergeProviderKeyPayload = (
   knownFields: readonly string[]
 ) => {
   const next = mergeKnownFields(raw, payload, knownFields);
+  const rawApiKeyEntries = isRecord(raw) ? raw['api-key-entries'] : undefined;
+  const apiKeyEntries = payload['api-key-entries'];
+  if (Array.isArray(apiKeyEntries)) {
+    next['api-key-entries'] = mergeKnownRecordList(
+      rawApiKeyEntries,
+      apiKeyEntries.filter(isRecord),
+      API_KEY_ENTRY_FIELDS,
+      apiKeyEntryIdentity
+    );
+  }
   const models = mergeModelPayloads(raw, payload.models);
   if (models) next.models = models;
   if (isRecord(payload.cloak)) {
@@ -280,10 +290,14 @@ const extractArrayPayload = (data: unknown, key: string): unknown[] => {
   return Array.isArray(list) ? list : [];
 };
 
-const buildProviderDeleteQuery = (apiKey: string, baseUrl?: string) => {
+const buildProviderDeleteQuery = (apiKey: string, baseUrl?: string, index?: number) => {
   const params = new URLSearchParams();
-  params.set('api-key', apiKey.trim());
-  params.set('base-url', (baseUrl ?? '').trim());
+  if (!apiKey.trim() && index !== undefined) {
+    params.set('index', String(index));
+  } else {
+    params.set('api-key', apiKey.trim());
+    params.set('base-url', (baseUrl ?? '').trim());
+  }
   return `?${params.toString()}`;
 };
 
@@ -321,7 +335,13 @@ const serializeApiKeyEntry = (entry: ApiKeyEntry) => {
 };
 
 const serializeProviderKey = (config: ProviderKeyConfig) => {
-  const payload: Record<string, unknown> = { 'api-key': config.apiKey };
+  const payload: Record<string, unknown> = {};
+  if (config.apiKey) payload['api-key'] = config.apiKey;
+  if (config.apiKeyEntries && config.apiKeyEntries.length) {
+    payload['api-key-entries'] = config.apiKeyEntries.map((entry) =>
+      serializeApiKeyEntry(entry)
+    );
+  }
   if (config.priority !== undefined) payload.priority = config.priority;
   if (config.weight !== undefined) payload.weight = config.weight;
   if (config.prefix?.trim()) payload.prefix = config.prefix.trim();
@@ -487,8 +507,8 @@ export const providersApi = {
       )
     ),
 
-  deleteCodexConfig: (apiKey: string, baseUrl?: string) =>
-    apiClient.delete(`/codex-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+  deleteCodexConfig: (apiKey: string, baseUrl?: string, index?: number) =>
+    apiClient.delete(`/codex-api-key${buildProviderDeleteQuery(apiKey, baseUrl, index)}`),
 
   createXAIConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('xai-api-key', (latestItems) =>
@@ -507,8 +527,8 @@ export const providersApi = {
       )
     ),
 
-  deleteXAIConfig: (apiKey: string, baseUrl?: string) =>
-    apiClient.delete(`/xai-api-key${buildProviderDeleteQuery(apiKey, baseUrl)}`),
+  deleteXAIConfig: (apiKey: string, baseUrl?: string, index?: number) =>
+    apiClient.delete(`/xai-api-key${buildProviderDeleteQuery(apiKey, baseUrl, index)}`),
 
   createClaudeConfig: (config: ProviderKeyConfig) =>
     mutateLatestProviderList('claude-api-key', (latestItems) =>

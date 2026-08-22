@@ -309,8 +309,12 @@ export function useConnectivityTest(
     const customHeaders = buildHeaderObject(formHeaders);
     const explicitKey = (apiKey ?? '').trim();
     const persistedKey = (fallbackApiKey ?? '').trim();
+    const bundledKey =
+      (apiKeyEntries ?? [])
+        .map((entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim())
+        .find((key) => key) ?? '';
     const hasAuthorization = hasHeader(customHeaders, 'authorization');
-    const resolvedKey = explicitKey || persistedKey;
+    const resolvedKey = explicitKey || persistedKey || bundledKey;
     const resolvedAuthIndex = (authIndex ?? '').trim() || undefined;
 
     if (!resolvedKey && !hasAuthorization && !resolvedAuthIndex) {
@@ -359,7 +363,7 @@ export function useConnectivityTest(
     } finally {
       setInFlight((n) => n - 1);
     }
-  }, [apiKey, authIndex, baseUrl, brand, fallbackApiKey, formHeaders, messages, models, testModel]);
+  }, [apiKey, apiKeyEntries, authIndex, baseUrl, brand, fallbackApiKey, formHeaders, messages, models, testModel]);
 
   const runGemini = useCallback(async (): Promise<void> => {
     if (brand !== 'gemini' && brand !== 'interactions') return;

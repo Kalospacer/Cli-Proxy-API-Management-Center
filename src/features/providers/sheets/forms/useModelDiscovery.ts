@@ -64,7 +64,12 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           resolvedAuthIndex
         );
       } else if (brand === 'codex' || brand === 'xai') {
-        const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
+        const key =
+          (apiKey ?? '').trim() ||
+          (fallbackApiKey ?? '').trim() ||
+          ((apiKeyEntries ?? [])
+            .map((entry) => (entry.apiKey ?? '').trim() || (entry.existingApiKey ?? '').trim())
+            .find((k) => k) ?? '');
         next = await modelsApi.fetchV1ModelsViaApiCall(
           baseUrl,
           key,

@@ -127,7 +127,7 @@ function providerKeyToResource(
     priority: normalizePriority(config.priority),
     headerCount: countHeaders(config.headers),
     excludedModelCount: stripDisableAllModelsRule(config.excludedModels).length,
-    apiKeyEntryCount: bundledEntries?.length ?? 0,
+    apiKeyEntryCount: bundledEntries?.length ?? (apiKey ? 1 : 0),
     disabled,
     flags,
     selector,

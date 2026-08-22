@@ -216,7 +216,17 @@ function buildInitialForm(
               weight: entry.weight,
               authIndex: entry.authIndex,
             }))
-          : [emptyApiKeyEntry()]
+          : cfg.apiKey?.trim()
+            ? [
+                {
+                  apiKey: '',
+                  existingApiKey: cfg.apiKey,
+                  proxyUrl: '',
+                  weight: undefined,
+                  authIndex: undefined,
+                },
+              ]
+            : [emptyApiKeyEntry()]
         : undefined,
 
   };
@@ -551,7 +561,7 @@ export function BaseProviderForm({
           </div>
         ) : null}
 
-        {descriptor.supportsApiKey ? (
+        {descriptor.supportsApiKey && brand !== 'codex' ? (
           <div className={styles.field}>
             <label className={styles.label} htmlFor={`${fid}-apiKey`}>
               {t('providersPage.form.apiKey')}

@@ -201,12 +201,16 @@ const buildProviderKeyConfig = (
     next.websockets = input.websockets;
   }
   if (brand === 'codex' || brand === 'xai') {
-    const existingEntries = (existing as ProviderKeyConfig | undefined)?.apiKeyEntries;
+    const existingProvider = existing as ProviderKeyConfig | undefined;
+    const existingEntries = existingProvider?.apiKeyEntries;
+    const singleExistingKey = existingProvider?.apiKey?.trim() ?? '';
     const entries =
       input.apiKeyEntries
         ?.map((entry, index) => {
           const fallbackApiKey =
-            entry.existingApiKey?.trim() || existingEntries?.[index]?.apiKey?.trim() || '';
+            entry.existingApiKey?.trim() ||
+            existingEntries?.[index]?.apiKey?.trim() ||
+            (index === 0 ? singleExistingKey : '');
           return {
             apiKey: entry.apiKey.trim() || fallbackApiKey,
             proxyUrl: entry.proxyUrl.trim() || undefined,
@@ -215,7 +219,11 @@ const buildProviderKeyConfig = (
           };
         })
         .filter((entry) => entry.apiKey) ?? [];
-    if (entries.length) next.apiKeyEntries = entries;
+    if (entries.length === 1) {
+      next.apiKey = entries[0].apiKey;
+    } else if (entries.length > 1) {
+      next.apiKeyEntries = entries;
+    }
   }
   if (brand === 'claude' && input.cloak) {
     next.cloak = {

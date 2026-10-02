@@ -185,7 +185,7 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility') return false;
+      if (brand !== 'openaiCompatibility' && brand !== 'codex' && brand !== 'xai') return false;
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -195,7 +195,10 @@ export function useConnectivityTest(
         });
         return false;
       }
-      const endpoint = buildOpenAIChatCompletionsEndpoint(trimmedBase);
+      const endpoint =
+        brand === 'openaiCompatibility'
+          ? buildOpenAIChatCompletionsEndpoint(trimmedBase)
+          : buildCodexResponsesEndpoint(trimmedBase);
       if (!endpoint) {
         updateOpenaiStatus(idx, {
           state: 'error',
@@ -245,12 +248,16 @@ export function useConnectivityTest(
             method: 'POST',
             url: endpoint,
             header: headerObj,
-            data: JSON.stringify({
-              model,
-              messages: [{ role: 'user', content: 'Hi' }],
-              stream: false,
-              max_tokens: 5,
-            }),
+            data: JSON.stringify(
+              brand === 'openaiCompatibility'
+                ? {
+                    model,
+                    messages: [{ role: 'user', content: 'Hi' }],
+                    stream: false,
+                    max_tokens: 5,
+                  }
+                : { model, input: 'Hi', stream: false }
+            ),
           },
           { timeout: DEFAULT_TIMEOUT_MS }
         );
@@ -283,7 +290,7 @@ export function useConnectivityTest(
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility') return;
+    if (brand !== 'openaiCompatibility' && brand !== 'codex' && brand !== 'xai') return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
@@ -314,7 +321,11 @@ export function useConnectivityTest(
     const explicitKey = (apiKey ?? '').trim();
     const persistedKey = (fallbackApiKey ?? '').trim();
     const hasAuthorization = hasHeader(customHeaders, 'authorization');
-    const resolvedKey = explicitKey || persistedKey;
+    const entryKey =
+      (apiKeyEntries ?? [])
+        .map((entry) => entry.apiKey.trim() || entry.existingApiKey?.trim() || '')
+        .find(Boolean) ?? '';
+    const resolvedKey = explicitKey || persistedKey || entryKey;
     const resolvedAuthIndex = (authIndex ?? '').trim() || undefined;
 
     if (!resolvedKey && !hasAuthorization && !resolvedAuthIndex) {
@@ -366,6 +377,7 @@ export function useConnectivityTest(
     }
   }, [
     apiKey,
+    apiKeyEntries,
     authIndex,
     baseUrl,
     brand,

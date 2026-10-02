@@ -43,6 +43,9 @@ Preserve hash routing and single-file deployment. Changes to assets, imports, co
 - `useConfigStore.fetchConfig(forceRefresh?: boolean)` uses a full-config TTL cache and in-flight request deduplication, not section-based fetching. Reuse it where appropriate and invalidate/update caches after mutations using existing store actions.
 - Preserve stale-request guards and cache cleanup when switching connections or logging out. Old asynchronous responses must not overwrite the new session's state.
 - Provider UI capabilities live in `src/features/providers/descriptors.ts`; `adapters.ts` maps provider configs to the shared resource model. Extend these existing abstractions rather than scattering provider-specific conditionals across components.
+- The restored TypeSafe provider uses `/config/api-keys/typesafe` through the v8 API client. It requires a backend whose v8 family mapping includes `typesafe`; do not silently fall back to `/v0/management/typesafe-api-key`. TypeSafe is not a generic Responses probe target, so its key editor must not offer standard connectivity tests.
+- Codex, xAI, and TypeSafe may carry nested `api-key-entries` inside a v8 credential row. Keep their per-entry `sourceIndex` for mutation identity, preserve unknown persisted entry fields, and omit response-only `auth-index` on writes. OpenAI compatibility still uses group-level `keys`; do not conflate the two shapes.
+- See `docs/live-panel-patch-restoration.md` for the recovered production-patch behavior and its validation boundaries. Never patch generated `management.html` to maintain these features.
 
 ## Coding Style & UI Conventions
 

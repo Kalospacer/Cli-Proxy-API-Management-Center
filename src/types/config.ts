@@ -32,6 +32,7 @@ export interface Config {
   claudeApiKeys?: ProviderKeyConfig[];
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
+  typesafeApiKeys?: ProviderKeyConfig[];
   oauthExcludedModels?: Record<string, string[]>;
   raw?: Record<string, unknown>;
 }
@@ -53,6 +54,7 @@ export type RawConfigSection =
   | 'codex-api-key'
   | 'meta-api-key'
   | 'xai-api-key'
+  | 'typesafe-api-key'
   | 'claude-api-key'
   | 'vertex-api-key'
   | 'openai-compatibility'

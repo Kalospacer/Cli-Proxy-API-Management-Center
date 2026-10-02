@@ -148,9 +148,17 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
   const record = isRecord(item) ? item : null;
   const apiKey = record?.['api-key'] ?? (typeof item === 'string' ? item : '');
   const trimmed = String(apiKey || '').trim();
-  if (!trimmed) return null;
+  const bundled = record?.['api-key-entries'];
+  const apiKeyEntries = Array.isArray(bundled)
+    ? bundled.flatMap((entry, sourceIndex) => {
+        const normalized = normalizeApiKeyEntry(entry);
+        return normalized ? [{ ...normalized, sourceIndex }] : [];
+      })
+    : [];
+  if (!trimmed && !apiKeyEntries.length) return null;
 
   const config: ProviderKeyConfig = { apiKey: trimmed, ...normalizeRuntimePolicy(record) };
+  if (apiKeyEntries.length) config.apiKeyEntries = apiKeyEntries;
   for (const [key, wire] of [
     ['alphaSearch', 'alpha-search'],
     ['disableCodexCloaking', 'disable-codex-cloaking'],
@@ -387,6 +395,7 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
     at('api-keys.openai-compatibility'),
     true
   ) as OpenAIProviderConfig[];
+  config.typesafeApiKeys = normalizeProviderGroups(at('api-keys.typesafe')) as ProviderKeyConfig[];
   config.oauthExcludedModels = normalizeOauthExcluded(at('oauth.excluded-models'));
   return config;
 };

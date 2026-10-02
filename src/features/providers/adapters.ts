@@ -59,11 +59,13 @@ const truncateForId = (value: string | undefined | null): string => {
 };
 
 function providerKeyToResource(
-  brand: 'gemini' | 'interactions' | 'codex' | 'meta' | 'xai' | 'claude' | 'vertex',
+  brand: 'gemini' | 'interactions' | 'codex' | 'meta' | 'xai' | 'claude' | 'vertex' | 'typesafe',
   config: GeminiKeyConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {
   const apiKey = config.apiKey ?? '';
+  const entries = 'apiKeyEntries' in config ? config.apiKeyEntries : undefined;
+  const displayKey = apiKey || entries?.[0]?.apiKey || '';
   const disabled = hasDisableAllModelsRule(config.excludedModels);
   const flags: ProviderResource['flags'] = {};
   if (brand === 'codex' || brand === 'xai') {
@@ -87,8 +89,8 @@ function providerKeyToResource(
     brand,
     originalIndex: index,
     name: typeof config.source?.group.name === 'string' ? config.source.group.name : null,
-    identifier: maskApiKey(apiKey) || `#${index + 1}`,
-    apiKeyPreview: apiKey ? maskApiKey(apiKey) : null,
+    identifier: maskApiKey(displayKey) || `#${index + 1}`,
+    apiKeyPreview: displayKey ? maskApiKey(displayKey) : null,
     apiKey: apiKey || null,
     authIndex: config.authIndex ?? null,
     baseUrl: config.baseUrl ?? null,
@@ -99,7 +101,7 @@ function providerKeyToResource(
     priority: normalizePriority(config.priority),
     headerCount: countHeaders(config.headers),
     excludedModelCount: stripDisableAllModelsRule(config.excludedModels).length,
-    apiKeyEntryCount: 0,
+    apiKeyEntryCount: entries?.length ?? (displayKey ? 1 : 0),
     disabled,
     flags,
     selector,
@@ -129,6 +131,10 @@ export function xaiToResource(config: ProviderKeyConfig, index: number): Provide
 
 export function claudeToResource(config: ProviderKeyConfig, index: number): ProviderResource {
   return providerKeyToResource('claude', config, index);
+}
+
+export function typesafeToResource(config: ProviderKeyConfig, index: number): ProviderResource {
+  return providerKeyToResource('typesafe', config, index);
 }
 
 export function vertexToResource(config: ProviderKeyConfig, index: number): ProviderResource {

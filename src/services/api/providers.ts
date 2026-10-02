@@ -86,6 +86,9 @@ const serializeProviderKey = (config: ProviderKeyConfig, family: ProviderFamily)
     'api-key': config.apiKey,
     ...serializeRuntimePolicy(config),
   };
+  if (config.apiKeyEntries !== undefined) {
+    payload['api-key-entries'] = config.apiKeyEntries.map(serializeApiKeyEntry);
+  }
   if (config.priority !== undefined) payload.priority = config.priority;
   if (config.weight !== undefined) payload.weight = config.weight;
   if (config.prefix?.trim()) payload.prefix = config.prefix.trim();
@@ -219,7 +222,8 @@ export type ProviderFamily =
   | 'xai'
   | 'claude'
   | 'vertex'
-  | 'openai-compatibility';
+  | 'openai-compatibility'
+  | 'typesafe';
 type KeyConfig = ProviderKeyConfig | GeminiKeyConfig;
 const equal = (a: unknown, b: unknown): boolean => {
   if (a === b) return true;
@@ -466,6 +470,34 @@ const updateKey = async (
     config.models,
     family === 'vertex' ? serializeVertexModelAliases : serializeModelAliases
   );
+  if (
+    'apiKeyEntries' in config &&
+    config.apiKeyEntries !== undefined &&
+    !equal(before['api-key-entries'], after['api-key-entries'])
+  ) {
+    const rawEntries = rawKey['api-key-entries'];
+    const used = new Set<number>();
+    keys[keyIndex]['api-key-entries'] = config.apiKeyEntries.map((entry) => {
+      if (entry.sourceIndex === undefined) return serializeApiKeyEntry(entry);
+      if (
+        !Array.isArray(rawEntries) ||
+        used.has(entry.sourceIndex) ||
+        !isRecord(rawEntries[entry.sourceIndex])
+      )
+        throw conflict();
+      used.add(entry.sourceIndex);
+      const rawEntry = rawEntries[entry.sourceIndex];
+      const old = normalizeApiKeyEntry(rawEntry);
+      if (!old) throw conflict();
+      const next = applyProviderChanges(
+        rawEntry,
+        serializeApiKeyEntry(old),
+        serializeApiKeyEntry(entry)
+      );
+      delete next['auth-index'];
+      return next;
+    });
+  }
   // Response metadata belongs to credentials, not arbitrary nested maps such as headers.
   delete keys[keyIndex]['auth-index'];
   groups[index] = { ...nextGroup, keys };
@@ -538,6 +570,13 @@ export const providersApi = {
   async getVertexConfigs() {
     return normalizeProviderGroups(await getGroups('vertex')) as ProviderKeyConfig[];
   },
+  getTypeSafeConfigs: async () =>
+    normalizeProviderGroups(await getGroups('typesafe')) as ProviderKeyConfig[],
+  createTypeSafeConfig: (config: ProviderKeyConfig) => createKey('typesafe', config),
+  updateTypeSafeConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
+    updateKey('typesafe', apiKey, baseUrl, config),
+  deleteTypeSafeConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
+    deleteKey('typesafe', apiKey, baseUrl, source),
   async getOpenAIProviders() {
     return normalizeProviderGroups(
       await getGroups('openai-compatibility'),

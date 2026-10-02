@@ -1972,7 +1972,8 @@
       "apikeyFun": "APIKEY.FUN",
       "fennoAI": "FennoAI",
       "qiniuCloud": "七牛雲",
-      "kimi": "Kimi"
+      "kimi": "Kimi",
+      "typesafe": "TypeSafe"
     },
     "table": {
       "key": "金鑰",

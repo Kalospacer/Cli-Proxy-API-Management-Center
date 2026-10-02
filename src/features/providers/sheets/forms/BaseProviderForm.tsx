@@ -1,3 +1,4 @@
+import { initialBundledEntries, isBundledKeyBrand } from '../../bundledKeys';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -85,7 +86,14 @@ function buildInitialForm(
     return {
       apiKey: '',
       name: '',
-      baseUrl: brand === 'meta' ? META_API_BASE_URL : brand === 'xai' ? XAI_API_BASE_URL : '',
+      baseUrl:
+        brand === 'meta'
+          ? META_API_BASE_URL
+          : brand === 'xai'
+            ? XAI_API_BASE_URL
+            : brand === 'typesafe'
+              ? 'https://api.typesafe.ai'
+              : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,
@@ -111,7 +119,12 @@ function buildInitialForm(
         brand === 'interactions'
           ? ''
           : undefined,
-      apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
+      apiKeyEntries:
+        brand === 'openaiCompatibility'
+          ? [emptyApiKeyEntry()]
+          : isBundledKeyBrand(brand)
+            ? initialBundledEntries()
+            : undefined,
     };
   }
 
@@ -193,6 +206,9 @@ function buildInitialForm(
       ? Object.entries(cfg.headers).map(([k, v]) => ({ key: k, value: String(v) }))
       : [emptyHeader()],
     excludedModelsText: excludedList.join('\n'),
+    apiKeyEntries: isBundledKeyBrand(brand)
+      ? initialBundledEntries(brand === 'typesafe' ? { ...cfg, apiKey: '' } : cfg)
+      : undefined,
     websockets:
       brand === 'codex' || brand === 'xai'
         ? (cfg as ProviderKeyConfig).websockets === true
@@ -389,14 +405,21 @@ export function BaseProviderForm({
     if (descriptor.supportsName && !form.name.trim()) {
       return t('providersPage.form.validation.nameRequired');
     }
-    if (descriptor.supportsApiKey && mode === 'create' && !form.apiKey.trim()) {
+    if (
+      (descriptor.supportsApiKey || descriptor.supportsApiKeyEntries) &&
+      mode === 'create' &&
+      !form.apiKey.trim() &&
+      !(form.apiKeyEntries ?? []).some(
+        (entry) => entry.apiKey.trim() || entry.existingApiKey?.trim()
+      )
+    ) {
       return t('providersPage.form.validation.apiKeyRequired');
     }
     if (descriptor.baseUrlRequired && !form.baseUrl.trim()) {
       return t('providersPage.form.validation.baseUrlRequired');
     }
     const weights = [
-      ...(brand === 'openaiCompatibility'
+      ...(descriptor.supportsApiKeyEntries
         ? (form.apiKeyEntries ?? []).map((entry) => entry.weight)
         : []),
       ...(brand !== 'openaiCompatibility' ? [form.weight] : []),
@@ -476,7 +499,7 @@ export function BaseProviderForm({
   const actualApiKeyEntries = form.apiKeyEntries ?? [];
   const supportsModelImage = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'codex' || brand === 'meta' || brand === 'xai'
+    (brand === 'codex' || brand === 'meta' || brand === 'xai') && !descriptor.supportsApiKeyEntries
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
       : brand === 'gemini' || brand === 'interactions'
         ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
@@ -768,6 +791,7 @@ export function BaseProviderForm({
         >
           <ApiKeyEntriesEditor
             entries={apiKeyEntries}
+            allowTesting={brand !== 'typesafe'}
             removeDisabled={actualApiKeyEntries.length === 0}
             mutating={mutating}
             statuses={connectivity.openaiStatuses}

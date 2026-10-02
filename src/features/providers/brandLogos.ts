@@ -31,6 +31,7 @@ export const PROVIDER_LOGOS: Record<ProviderBrandLogoKey, ProviderBrandLogo> = {
   interactions: { src: geminiLogo },
   claude: { src: claudeLogo },
   codex: { src: codexLogo },
+  typesafe: { src: codexLogo },
   meta: { src: metaLogo, transparent: true },
   devin: { src: devinLightLogo, darkSrc: devinDarkLogo, transparent: true },
   xai: { src: xaiLightLogo, darkSrc: xaiDarkLogo, transparent: true },

@@ -84,6 +84,7 @@ export interface GeminiKeyConfig extends ProviderRuntimePolicy {
 }
 
 export interface ProviderKeyConfig extends ProviderRuntimePolicy, ProviderBehaviorOptions {
+  apiKeyEntries?: ApiKeyEntry[];
   source?: ProviderSource;
   apiKey: string;
   priority?: number;

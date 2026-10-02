@@ -20,7 +20,8 @@ export type ProviderBrand =
   | 'apikeyFun'
   | 'fennoAI'
   | 'qiniuCloud'
-  | 'kimi';
+  | 'kimi'
+  | 'typesafe';
 
 export type SponsorProviderBrand = 'apikeyFun' | 'fennoAI' | 'qiniuCloud' | 'kimi';
 
@@ -38,6 +39,7 @@ export type ProviderResourceSelector =
   | { brand: 'xai'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'vertex'; apiKey: string; baseUrl?: string; index: number }
+  | { brand: 'typesafe'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'openaiCompatibility'; name: string; index: number }
   | {
       brand: 'apikeyFun';

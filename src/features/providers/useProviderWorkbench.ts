@@ -1,3 +1,4 @@
+import { buildBundledEntries, isBundledKeyBrand } from './bundledKeys';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { providersApi } from '@/services/api';
 import { getErrorMessage } from '@/utils/helpers';
@@ -26,6 +27,7 @@ import {
   qiniuCloudToResource,
   kimiToResource,
   vertexToResource,
+  typesafeToResource,
   xaiToResource,
 } from './adapters';
 import { PROVIDER_BRAND_ORDER, PROVIDER_DESCRIPTORS } from './descriptors';
@@ -147,8 +149,8 @@ const buildModelAliases = (
     })
     .filter((m) => m.name);
 
-const buildProviderKeyConfig = (
-  brand: 'gemini' | 'interactions' | 'codex' | 'meta' | 'xai' | 'claude' | 'vertex',
+export const buildProviderKeyConfig = (
+  brand: 'gemini' | 'interactions' | 'codex' | 'meta' | 'xai' | 'claude' | 'vertex' | 'typesafe',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -177,6 +179,23 @@ const buildProviderKeyConfig = (
     authIndex: existing?.authIndex,
     ...pickProviderBehavior(input, brand),
   };
+  if (isBundledKeyBrand(brand) && input.apiKeyEntries) {
+    const old = existing as ProviderKeyConfig | undefined;
+    const entries = buildBundledEntries(
+      input.apiKeyEntries,
+      brand === 'typesafe' ? { ...old, apiKey: '' } : old
+    );
+    if (brand === 'typesafe') {
+      next.apiKeyEntries = entries.length || old?.apiKeyEntries !== undefined ? entries : undefined;
+    } else if (entries.length === 1 && !old?.apiKeyEntries?.length) {
+      next.apiKey = entries[0].apiKey;
+      next.proxyUrl = entries[0].proxyUrl ?? next.proxyUrl;
+      next.weight = entries[0].weight ?? next.weight;
+    } else {
+      next.apiKey = old?.apiKeyEntries?.length ? old.apiKey : '';
+      next.apiKeyEntries = entries;
+    }
+  }
   if ((brand === 'codex' || brand === 'xai') && input.websockets !== undefined) {
     next.websockets = input.websockets;
   }
@@ -418,6 +437,11 @@ export const buildProviderGroups = (config: Config): ProviderGroup[] =>
           vertexToResource(item, index)
         );
         break;
+      case 'typesafe':
+        resources = (config.typesafeApiKeys ?? []).map((item, index) =>
+          typesafeToResource(item, index)
+        );
+        break;
       case 'openaiCompatibility':
         resources = (config.openaiCompatibility ?? []).reduce<ProviderResource[]>(
           (out, item, index) => {
@@ -488,10 +512,11 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
     setIsFetching(true);
     setErrorMessage(null);
     try {
-      const [configResult, vertexResult, openaiResult] = await Promise.allSettled([
+      const [configResult, vertexResult, openaiResult, typesafeResult] = await Promise.allSettled([
         fetchConfig(true),
         providersApi.getVertexConfigs(),
         providersApi.getOpenAIProviders(),
+        providersApi.getTypeSafeConfigs(),
       ]);
       if (configResult.status !== 'fulfilled') {
         throw configResult.reason;
@@ -501,6 +526,9 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
       }
       if (openaiResult.status === 'fulfilled') {
         updateConfigValue('openai-compatibility', openaiResult.value || []);
+      }
+      if (typesafeResult.status === 'fulfilled') {
+        updateConfigValue('typesafe-api-key', typesafeResult.value || []);
       }
       setFetchedAt(new Date().toISOString());
     } catch (err) {
@@ -688,6 +716,10 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           await providersApi.createVertexConfig(
             buildProviderKeyConfig('vertex', input) as ProviderKeyConfig
           );
+        } else if (brand === 'typesafe') {
+          await providersApi.createTypeSafeConfig(
+            buildProviderKeyConfig('typesafe', input) as ProviderKeyConfig
+          );
         } else if (brand === 'openaiCompatibility') {
           await providersApi.createOpenAIProvider(buildOpenAIConfig(input));
         } else if (
@@ -760,6 +792,13 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             selector.apiKey,
             selector.baseUrl,
             buildProviderKeyConfig('vertex', input, existing) as ProviderKeyConfig
+          );
+        } else if (brand === 'typesafe' && selector.brand === 'typesafe') {
+          const existing = resource.raw as ProviderKeyConfig;
+          await providersApi.updateTypeSafeConfig(
+            selector.apiKey,
+            selector.baseUrl,
+            buildProviderKeyConfig('typesafe', input, existing) as ProviderKeyConfig
           );
         } else if (brand === 'openaiCompatibility' && selector.brand === 'openaiCompatibility') {
           await providersApi.updateOpenAIProvider(
@@ -844,6 +883,14 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           );
           const next = (config?.vertexApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('vertex-api-key', next);
+        } else if (sel.brand === 'typesafe') {
+          await providersApi.deleteTypeSafeConfig(
+            sel.apiKey,
+            sel.baseUrl,
+            (resource.raw as ProviderKeyConfig).source
+          );
+          const next = (config?.typesafeApiKeys ?? []).filter((_, i) => i !== sel.index);
+          updateConfigValue('typesafe-api-key', next);
         } else if (sel.brand === 'openaiCompatibility') {
           await providersApi.deleteOpenAIProvider(
             sel.index,
@@ -930,7 +977,8 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           (brand === 'meta' && selector.brand === 'meta') ||
           (brand === 'xai' && selector.brand === 'xai') ||
           (brand === 'claude' && selector.brand === 'claude') ||
-          (brand === 'vertex' && selector.brand === 'vertex')
+          (brand === 'vertex' && selector.brand === 'vertex') ||
+          (brand === 'typesafe' && selector.brand === 'typesafe')
         ) {
           const current = resource.raw as ProviderKeyConfig;
           const excluded = disabled
@@ -945,6 +993,8 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             await providersApi.updateXAIConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'claude') {
             await providersApi.updateClaudeConfig(selector.apiKey, selector.baseUrl, next);
+          } else if (selector.brand === 'typesafe') {
+            await providersApi.updateTypeSafeConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'vertex') {
             await providersApi.updateVertexConfig(selector.apiKey, selector.baseUrl, next);
           }

@@ -34,6 +34,8 @@ The production artifact is a single `dist/index.html` with JS/CSS and bundled as
 
 Preserve hash routing and single-file deployment. Changes to assets, imports, code splitting, or build configuration must not introduce required external build artifacts. Do not edit generated `dist/` files. App version is injected as `__APP_VERSION__` from `VERSION`, then git tags, then the package version, falling back to `dev`.
 
+Build release artifacts with `bun install --frozen-lockfile` only. A hoisted install from another package manager produced two physical copies of `react-router`, which split the router context and crashed the deployed panel with `useLocation() may be used only in the context of a <Router> component`. After building, confirm the bundle contains exactly one occurrence of that router error string and one `react-router-dom` copy before deploying.
+
 ## API Contracts & State
 
 - Treat backend contracts as the source of truth. Inspect `../CLIProxyAPI` before changing endpoint names, payloads, provider keys, OAuth callback parameters, auth-file semantics, or plugin/config contracts. If that checkout is unavailable, report the missing evidence rather than guessing; do not modify the backend unless requested.

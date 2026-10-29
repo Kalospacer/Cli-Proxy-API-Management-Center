@@ -1,4 +1,5 @@
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
 import { hasDisableAllModelsRule, stripDisableAllModelsRule } from '@/components/providers/utils';
 import { maskApiKey } from '@/utils/format';
 import {
@@ -115,8 +116,29 @@ export function interactionsToResource(config: GeminiKeyConfig, index: number): 
   return providerKeyToResource('interactions', config, index);
 }
 
-export function codexToResource(config: ProviderKeyConfig, index: number): ProviderResource {
-  return providerKeyToResource('codex', config, index);
+export function codexToResource(
+  config: CodexProviderGroupConfig | ProviderKeyConfig,
+  index: number
+): ProviderResource {
+  if (!('members' in config)) {
+    const resource = providerKeyToResource('codex', config, index);
+    return { ...resource, flags: { ...resource.flags, singleCodex: true } };
+  }
+  const resource = openaiToResource(config, index);
+  const disabledCount = config.members.filter((member) =>
+    hasDisableAllModelsRule(member.excludedModels)
+  ).length;
+  return {
+    ...resource,
+    id: buildId('codex', config.source?.groupIndex ?? index, truncateForId(config.name)),
+    brand: 'codex',
+    disabled: config.members.length > 0 && disabledCount === config.members.length,
+    flags: {
+      emptyCodex: config.members.length === 0,
+      mixedDisabled: disabledCount > 0 && disabledCount < config.members.length,
+    },
+    selector: { brand: 'codex', apiKey: '', baseUrl: config.baseUrl, index },
+  };
 }
 
 export function metaToResource(config: ProviderKeyConfig, index: number): ProviderResource {

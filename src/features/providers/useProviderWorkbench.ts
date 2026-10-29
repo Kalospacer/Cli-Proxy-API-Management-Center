@@ -3,6 +3,7 @@ import { providersApi } from '@/services/api';
 import { getErrorMessage } from '@/utils/helpers';
 import { useAuthStore, useConfigStore } from '@/stores';
 import {
+  hasDisableAllModelsRule,
   stripDisableAllModelsRule,
   withDisableAllModelsRule,
   withoutDisableAllModelsRule,
@@ -14,6 +15,7 @@ import type {
   OpenAIProviderConfig,
   ProviderKeyConfig,
 } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
 import {
   apiKeyFunToResource,
   claudeToResource,
@@ -193,17 +195,22 @@ const buildProviderKeyConfig = (
   return next;
 };
 
-const buildOpenAIConfig = (
+export const buildOpenAIConfig = (
   input: ProviderEntryFormInput,
-  existing?: OpenAIProviderConfig | null
+  existing?: OpenAIProviderConfig | null,
+  brand: 'codex' | 'openaiCompatibility' = 'openaiCompatibility'
 ): OpenAIProviderConfig => {
   const headers = headersFromEntries(input.headers);
   const models = buildModelAliases(input.models, true);
   const apiKeyEntries =
     input.apiKeyEntries
-      ?.map((entry, index) => {
+      ?.map((entry) => {
         const fallbackApiKey =
-          entry.existingApiKey?.trim() || existing?.apiKeyEntries?.[index]?.apiKey?.trim() || '';
+          entry.existingApiKey?.trim() ||
+          (entry.sourceIndex === undefined
+            ? ''
+            : existing?.apiKeyEntries?.find((item) => item.sourceIndex === entry.sourceIndex)?.apiKey?.trim()) ||
+          '';
         return {
           apiKey: entry.apiKey.trim() || fallbackApiKey,
           sourceIndex: entry.sourceIndex,
@@ -221,7 +228,16 @@ const buildOpenAIConfig = (
     prefix: input.prefix.trim() || undefined,
     apiKeyEntries,
     disabled: input.disabled,
-    ...pickProviderBehavior(input, 'openaiCompatibility'),
+    ...(brand === 'codex'
+      ? {
+          proxyUrl: input.proxyUrl.trim() || undefined,
+          excludedModels: buildExcludedModels(
+            input.excludedModelsText,
+            hasDisableAllModelsRule((existing as CodexProviderGroupConfig | null)?.excludedModels),
+            brand
+          ),
+        }
+      : pickProviderBehavior(input, brand)),
     disableCooling: input.disableCooling,
     ...(input.runtimePolicy ? buildRuntimePolicy(input.runtimePolicy) : {}),
     headers: Object.keys(headers).length ? headers : undefined,
@@ -380,15 +396,26 @@ export const buildProviderGroups = (config: Config): ProviderGroup[] =>
         );
         break;
       case 'codex':
-        resources = (config.codexApiKeys ?? []).reduce<ProviderResource[]>((out, item, index) => {
-          if (
-            !isApiKeyFunCodexProvider(item) &&
-            !isFennoAICodexProvider(item) &&
-            !isQiniuCloudCodexProvider(item) &&
-            !isKimiCodexProvider(item)
-          ) {
-            out.push(codexToResource(item, index));
-          }
+        if (!config.codexProviderGroups) {
+          resources = (config.codexApiKeys ?? []).reduce<ProviderResource[]>((out, item, index) => {
+            if (
+              !isApiKeyFunCodexProvider(item) &&
+              !isFennoAICodexProvider(item) &&
+              !isQiniuCloudCodexProvider(item) &&
+              !isKimiCodexProvider(item)
+            ) out.push(codexToResource(item, index));
+            return out;
+          }, []);
+          break;
+        }
+        resources = config.codexProviderGroups.reduce<ProviderResource[]>((out, item, index) => {
+          const sponsored = item.members.some((member) =>
+            isApiKeyFunCodexProvider(member) ||
+            isFennoAICodexProvider(member) ||
+            isQiniuCloudCodexProvider(member) ||
+            isKimiCodexProvider(member)
+          );
+          if (!sponsored) out.push(codexToResource(item, index));
           return out;
         }, []);
         break;
@@ -667,9 +694,7 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             buildProviderKeyConfig('interactions', input) as GeminiKeyConfig
           );
         } else if (brand === 'codex') {
-          await providersApi.createCodexConfig(
-            buildProviderKeyConfig('codex', input) as ProviderKeyConfig
-          );
+          await providersApi.createCodexGroup(buildOpenAIConfig(input, null, 'codex'));
         } else if (brand === 'meta') {
           await providersApi.createMetaConfig(
             buildProviderKeyConfig('meta', input) as ProviderKeyConfig
@@ -725,12 +750,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             buildProviderKeyConfig('interactions', input, existing) as GeminiKeyConfig
           );
         } else if (brand === 'codex' && selector.brand === 'codex') {
-          const existing = resource.raw as ProviderKeyConfig;
-          await providersApi.updateCodexConfig(
-            selector.apiKey,
-            selector.baseUrl,
-            buildProviderKeyConfig('codex', input, existing) as ProviderKeyConfig
-          );
+          if (resource.flags.singleCodex) {
+            const existing = resource.raw as ProviderKeyConfig;
+            await providersApi.updateCodexConfig(
+              selector.apiKey,
+              selector.baseUrl,
+              buildProviderKeyConfig('codex', input, existing) as ProviderKeyConfig
+            );
+          } else {
+            const existing = resource.raw as OpenAIProviderConfig;
+            await providersApi.updateCodexGroup(
+              buildOpenAIConfig(input, existing, 'codex'),
+              input.disabled !== resource.disabled ? input.disabled : undefined
+            );
+          }
         } else if (brand === 'meta' && selector.brand === 'meta') {
           const existing = resource.raw as ProviderKeyConfig;
           await providersApi.updateMetaConfig(
@@ -803,13 +836,15 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           const next = (config?.interactionsApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('interactions-api-key', next);
         } else if (sel.brand === 'codex') {
-          await providersApi.deleteCodexConfig(
-            sel.apiKey,
-            sel.baseUrl,
-            (resource.raw as ProviderKeyConfig).source
-          );
-          const next = (config?.codexApiKeys ?? []).filter((_, i) => i !== sel.index);
-          updateConfigValue('codex-api-key', next);
+          if (resource.flags.singleCodex) {
+            await providersApi.deleteCodexConfig(
+              sel.apiKey,
+              sel.baseUrl,
+              (resource.raw as ProviderKeyConfig).source
+            );
+          } else {
+            await providersApi.deleteCodexGroup((resource.raw as OpenAIProviderConfig).source);
+          }
         } else if (sel.brand === 'meta') {
           await providersApi.deleteMetaConfig(
             sel.apiKey,
@@ -923,6 +958,8 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             ...current,
             excludedModels: excluded,
           });
+        } else if (brand === 'codex' && selector.brand === 'codex' && !resource.flags.singleCodex) {
+          await providersApi.updateCodexGroup(resource.raw as OpenAIProviderConfig, disabled);
         } else if (
           (brand === 'codex' && selector.brand === 'codex') ||
           (brand === 'meta' && selector.brand === 'meta') ||

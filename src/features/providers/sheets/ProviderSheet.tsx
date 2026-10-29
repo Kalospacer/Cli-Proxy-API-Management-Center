@@ -54,22 +54,27 @@ export function ProviderSheet({
   const formId = useId();
   const [submitting, setSubmitting] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [memberResource, setMemberResource] = useState<ProviderResource | null>(null);
+
+  useEffect(() => {
+    setMemberResource(null);
+  }, [state.open, state.resource?.id]);
 
   // Reset dirty flag whenever the sheet is closed or the editing target
   // (brand / resource / mode) changes — the child form will re-mount and
   // re-report its own dirty state.
   useEffect(() => {
     setIsDirty(false);
-  }, [state.brand, state.mode, state.resource?.id, state.open]);
+  }, [state.brand, state.mode, state.resource?.id, state.open, memberResource?.id]);
 
   const handleDirtyChange = useCallback((dirty: boolean) => {
     setIsDirty(dirty);
   }, []);
 
   const descriptor = PROVIDER_DESCRIPTORS[state.brand];
-  const isEditingForm = state.mode === 'create' || state.mode === 'edit';
+  const isEditingForm = state.mode === 'create' || state.mode === 'edit' || memberResource !== null;
   const formMutating = submitting || mutationDisabled;
-  const submitDisabled = formMutating || (state.mode === 'edit' && !isDirty);
+  const submitDisabled = formMutating || ((state.mode === 'edit' || memberResource !== null) && !isDirty);
 
   const confirmDiscardIfDirty = useCallback((): Promise<boolean> => {
     if (!isEditingForm || !isDirty || submitting) {
@@ -101,7 +106,7 @@ export function ProviderSheet({
       ? `${t('providersPage.form.createEyebrow')} · ${t(
           `providersPage.providerNames.${state.brand}`
         )}`
-      : state.mode === 'edit'
+      : state.mode === 'edit' || memberResource
         ? `${t('providersPage.form.editEyebrow')} · ${t(
             `providersPage.providerNames.${state.brand}`
           )}`
@@ -123,33 +128,41 @@ export function ProviderSheet({
 
   const handleUpdate = useCallback(
     async (input: ProviderEntryFormInput) => {
-      if (!state.resource || mutationDisabled || !isDirty) return;
+      const target = memberResource ?? state.resource;
+      if (!target || mutationDisabled || !isDirty) return;
       setSubmitting(true);
       try {
-        await workbench.updateProvider(state.resource, input);
+        await workbench.updateProvider(target, input);
         onUpdated();
       } finally {
         setSubmitting(false);
       }
     },
-    [isDirty, mutationDisabled, onUpdated, state.resource, workbench]
+    [isDirty, memberResource, mutationDisabled, onUpdated, state.resource, workbench]
   );
 
   const renderBody = () => {
-    if (state.mode === 'detail') {
+    if (state.mode === 'detail' && !memberResource) {
       if (!state.resource) {
         return null;
       }
-      return <ResourceDetailView resource={state.resource} usageByProvider={usageByProvider} />;
+      return (
+        <ResourceDetailView
+          resource={state.resource}
+          usageByProvider={usageByProvider}
+          onEditKey={setMemberResource}
+          mutationDisabled={formMutating}
+        />
+      );
     }
-    const formKey = `${state.brand}:${state.resource?.id ?? 'new'}:${state.mode}`;
+    const formKey = `${state.brand}:${(memberResource ?? state.resource)?.id ?? 'new'}:${state.mode}`;
     if (isMultiProtocolSponsorBrand(state.brand)) {
       return (
         <SponsorProviderForm
           key={formKey}
           brand={state.brand}
           resource={state.resource}
-          mode={state.mode}
+          mode={state.mode === 'create' ? 'create' : 'edit'}
           mutating={formMutating}
           formId={formId}
           onSubmit={state.mode === 'create' ? handleCreate : handleUpdate}
@@ -161,8 +174,8 @@ export function ProviderSheet({
       <BaseProviderForm
         key={formKey}
         brand={state.brand}
-        resource={state.resource}
-        mode={state.mode}
+        resource={memberResource ?? state.resource}
+        mode={state.mode === 'create' ? 'create' : 'edit'}
         mutating={formMutating}
         formId={formId}
         onSubmit={state.mode === 'create' ? handleCreate : handleUpdate}
@@ -172,7 +185,7 @@ export function ProviderSheet({
   };
 
   const footer =
-    state.mode === 'detail' ? (
+    state.mode === 'detail' && !memberResource ? (
       state.resource ? (
         <>
           <button
@@ -231,7 +244,7 @@ export function ProviderSheet({
       onClose={onClose}
       size={descriptor.sheetSize}
       eyebrow={
-        state.mode === 'detail'
+        state.mode === 'detail' && !memberResource
           ? t('providersPage.detail.title')
           : state.mode === 'create'
             ? t('providersPage.form.createEyebrow')

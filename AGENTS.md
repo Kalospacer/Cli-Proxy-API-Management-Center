@@ -45,6 +45,7 @@ Build release artifacts with `bun install --frozen-lockfile` only. A hoisted ins
 - `useConfigStore.fetchConfig(forceRefresh?: boolean)` uses a full-config TTL cache and in-flight request deduplication, not section-based fetching. Reuse it where appropriate and invalidate/update caches after mutations using existing store actions.
 - Preserve stale-request guards and cache cleanup when switching connections or logging out. Old asynchronous responses must not overwrite the new session's state.
 - Provider UI capabilities live in `src/features/providers/descriptors.ts`; `adapters.ts` maps provider configs to the shared resource model. Extend these existing abstractions rather than scattering provider-specific conditionals across components.
+- Codex provider UI groups credentials by their persisted v8 group, not by URL or key. Keep individual key overrides and source identities intact when editing a group; reuse the shared multi-key editor and preserve the per-key view for sponsor integrations.
 - Antigravity quota rendering depends on the Cloud Code client version and host: keep `ANTIGRAVITY_HUB_VERSION` at `2.23.0` or newer (older clients receive only the third-party quota group), and keep `daily-cloudcode-pa.googleapis.com` first in `ANTIGRAVITY_QUOTA_URLS` because it returns the fullest group set while `cloudcode-pa.googleapis.com` omits the `Gemini 4 Argon` group.
 
 ## Coding Style & UI Conventions

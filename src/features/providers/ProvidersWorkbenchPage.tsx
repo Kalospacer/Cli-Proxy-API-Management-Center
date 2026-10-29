@@ -12,6 +12,7 @@ import {
   type ProviderRecentUsageMap,
 } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
 import { ProviderHeaderCard } from './components/ProviderHeaderCard';
 import { ProviderCategoryList } from './components/ProviderCategoryList';
 import { ProviderResourcePanel } from './components/ProviderResourcePanel';
@@ -88,6 +89,13 @@ const getResourceRecentSuccess = (
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderRecentWindowStats(resource.raw as OpenAIProviderConfig, usageByProvider)
       .success;
+  }
+  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+    const group = resource.raw as CodexProviderGroupConfig;
+    return getOpenAIProviderRecentWindowStats(
+      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      usageByProvider
+    ).success;
   }
   return getProviderRecentWindowStats(
     usageByProvider,

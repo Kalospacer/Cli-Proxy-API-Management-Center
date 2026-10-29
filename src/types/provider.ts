@@ -100,6 +100,13 @@ export interface ProviderKeyConfig extends ProviderRuntimePolicy, ProviderBehavi
   authIndex?: string;
 }
 
+export interface CodexProviderGroupConfig extends OpenAIProviderConfig {
+  proxyUrl?: string;
+  excludedModels?: string[];
+  usageApiKeyEntries: ApiKeyEntry[];
+  members: ProviderKeyConfig[];
+}
+
 export interface OpenAIProviderConfig extends ProviderRuntimePolicy, ProviderBehaviorOptions {
   source?: ProviderSource;
   name: string;

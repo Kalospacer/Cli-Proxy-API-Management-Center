@@ -79,6 +79,46 @@ describe('provider probe proxy forwarding', () => {
     ]);
   });
 
+  test('Codex batch tests use Responses and each credential proxy', async () => {
+    requestSpy = spyOn(apiCallApi, 'request').mockResolvedValue(success);
+    const hook = captureHook(() => useConnectivityTest({
+      ...args,
+      apiKeyEntries: [
+        { apiKey: 'first-fixture', proxyUrl: 'direct' },
+        { apiKey: 'second-fixture', proxyUrl: 'http://proxy.example:8080' },
+      ],
+    }, messages));
+    await hook.runOpenAIAllKeys();
+    const requests = requestSpy.mock.calls.map(([request]) => request);
+    expect(requests).toHaveLength(2);
+    expect(requests.map((request) => request.url)).toEqual([
+      'https://upstream.example/v1/responses',
+      'https://upstream.example/v1/responses',
+    ]);
+    expect(requests.map((request) => request.proxy_url)).toEqual(['direct', 'http://proxy.example:8080']);
+    expect(requests.map((request) => JSON.parse(request.data as string).input)).toEqual(['Hi', 'Hi']);
+  });
+
+  test('Codex group connectivity and discovery select the first credential and its proxy', async () => {
+    requestSpy = spyOn(apiCallApi, 'request').mockResolvedValue(success);
+    const groupArgs = {
+      ...args, apiKey: '', fallbackApiKey: '', proxyUrl: 'direct',
+      apiKeyEntries: [{ apiKey: 'fixture-key', proxyUrl: 'http://one.example:8080' }],
+    };
+    const connectivity = captureHook(() => useConnectivityTest(groupArgs, messages));
+    await connectivity.runCodex();
+    const discovery = captureHook(() => useModelDiscovery(groupArgs));
+    await discovery.fetch();
+    const requests = requestSpy.mock.calls.map(([request]) => request);
+    expect(requests).toHaveLength(2);
+    expect(requests.map((request) => request.proxy_url)).toEqual([
+      'http://one.example:8080', 'http://one.example:8080',
+    ]);
+    expect(requests.map((request) => request.header?.Authorization)).toEqual([
+      'Bearer fixture-key', 'Bearer fixture-key',
+    ]);
+  });
+
   test.each(['codex', 'meta', 'xai', 'gemini', 'interactions', 'claude'] as const)(
     '%s discovery forwards the effective inherited proxy',
     async (brand) => {

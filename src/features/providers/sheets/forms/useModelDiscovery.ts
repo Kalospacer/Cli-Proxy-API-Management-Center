@@ -75,13 +75,20 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           proxyUrl
         );
       } else if (brand === 'codex' || brand === 'meta' || brand === 'xai') {
-        const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
+        const firstEntry = brand === 'codex'
+          ? (apiKeyEntries ?? []).find((entry) =>
+              entry.apiKey.trim() || entry.existingApiKey?.trim() || entry.authIndex?.trim()
+            )
+          : undefined;
+        const key = firstEntry
+          ? firstEntry.apiKey.trim() || firstEntry.existingApiKey?.trim() || ''
+          : (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();
         next = await modelsApi.fetchV1ModelsViaApiCall(
           baseUrl,
           key,
           baseHeaders,
-          resolvedAuthIndex,
-          proxyUrl
+          firstEntry?.authIndex?.trim() || resolvedAuthIndex,
+          firstEntry?.proxyUrl?.trim() || proxyUrl
         );
       } else if (brand === 'claude') {
         const key = (apiKey ?? '').trim() || (fallbackApiKey ?? '').trim();

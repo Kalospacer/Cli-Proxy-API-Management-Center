@@ -69,6 +69,9 @@ export type ProviderResourceSelector =
     };
 
 export interface ProviderResourceFlags {
+  mixedDisabled?: boolean;
+  emptyCodex?: boolean;
+  singleCodex?: boolean;
   cloakEnabled?: boolean;
   claudeCodeCliProfile?: boolean;
   websockets?: boolean;

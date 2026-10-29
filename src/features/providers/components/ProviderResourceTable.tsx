@@ -26,6 +26,7 @@ import {
   type ProviderRecentUsageMap,
 } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
 import type { StatusBarData } from '@/utils/recentRequests';
 import type { ProviderResource } from '../types';
 import { isMultiProtocolSponsorBrand } from '../sponsorDefinitions';
@@ -55,6 +56,13 @@ const resolveStatusBarData = (
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderRecentStatusData(resource.raw as OpenAIProviderConfig, usageByProvider);
   }
+  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+    const group = resource.raw as CodexProviderGroupConfig;
+    return getOpenAIProviderRecentStatusData(
+      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      usageByProvider
+    );
+  }
   return getProviderRecentStatusData(
     usageByProvider,
     getProviderUsageKey(resource.brand),
@@ -69,6 +77,13 @@ const resolveTotalStats = (
 ): { success: number; failure: number } => {
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderTotalStats(resource.raw as OpenAIProviderConfig, usageByProvider);
+  }
+  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+    const group = resource.raw as CodexProviderGroupConfig;
+    return getOpenAIProviderTotalStats(
+      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      usageByProvider
+    );
   }
   return getProviderTotalStats(
     usageByProvider,
@@ -116,7 +131,7 @@ export function ProviderResourceTable({
       });
       return <div className={styles.metricsCell}>{items}</div>;
     }
-    if (r.brand === 'openaiCompatibility') {
+    if (r.brand === 'openaiCompatibility' || r.brand === 'codex') {
       items.push(
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
         renderMetric('keys', t('providersPage.table.metrics.keys'), r.apiKeyEntryCount),
@@ -127,7 +142,7 @@ export function ProviderResourceTable({
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
         renderMetric('headers', t('providersPage.table.metrics.headers'), r.headerCount)
       );
-      if ((r.brand === 'codex' || r.brand === 'xai') && r.flags.websockets) {
+      if (r.brand === 'xai' && r.flags.websockets) {
         items.push(renderFlagTag('ws', t('providersPage.table.websocketsTag')));
       }
       if (r.brand === 'claude' && r.flags.cloakEnabled) {
@@ -141,6 +156,22 @@ export function ProviderResourceTable({
   };
 
   const renderStatus = (r: ProviderResource) => {
+    if (r.flags.emptyCodex) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusDisabled}`}>
+          <IconAlertTriangle size={14} />
+          {t('providersPage.status.notConfigured')}
+        </span>
+      );
+    }
+    if (r.flags.mixedDisabled) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusDisabled}`}>
+          <IconAlertTriangle size={14} />
+          {t('providersPage.status.active')} / {t('providersPage.status.disabled')}
+        </span>
+      );
+    }
     if (r.disabled) {
       return (
         <span className={`${styles.statusBadge} ${styles.statusDisabled}`}>
@@ -168,7 +199,7 @@ export function ProviderResourceTable({
         </div>
       );
     }
-    if (r.brand === 'openaiCompatibility') {
+    if (r.brand === 'openaiCompatibility' || r.brand === 'codex') {
       const extra = r.apiKeyEntryCount > 1 ? ` · +${r.apiKeyEntryCount - 1}` : '';
       return (
         <div className={styles.primaryCell}>

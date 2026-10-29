@@ -19,6 +19,7 @@ import {
 } from '@/components/excludedModels';
 import { hasDisableAllModelsRule } from '@/components/providers/utils';
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
 import type { ModelInfo } from '@/utils/models';
 import { PROVIDER_DESCRIPTORS } from '../../descriptors';
 import { mergeDiscoveredModels } from '../../modelEntries';
@@ -111,20 +112,22 @@ function buildInitialForm(
         brand === 'interactions'
           ? ''
           : undefined,
-      apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
+      apiKeyEntries:
+        brand === 'openaiCompatibility' || brand === 'codex' ? [emptyApiKeyEntry()] : undefined,
     };
   }
 
   const raw = resource.raw;
-  if (brand === 'openaiCompatibility') {
+  if (brand === 'openaiCompatibility' || (brand === 'codex' && !resource.flags.singleCodex)) {
     const cfg = raw as OpenAIProviderConfig;
+    const codex = brand === 'codex' ? (raw as CodexProviderGroupConfig) : undefined;
     return {
       apiKey: '',
       name: cfg.name ?? '',
       baseUrl: cfg.baseUrl ?? '',
-      proxyUrl: '',
+      proxyUrl: codex?.proxyUrl ?? '',
       prefix: cfg.prefix ?? '',
-      disabled: cfg.disabled === true,
+      disabled: brand === 'codex' ? resource.disabled : cfg.disabled === true,
       disableCooling: cfg.disableCooling,
       runtimePolicy: readRuntimePolicy(cfg),
       ...pickProviderBehavior(cfg, brand),
@@ -143,7 +146,7 @@ function buildInitialForm(
       headers: cfg.headers
         ? Object.entries(cfg.headers).map(([k, v]) => ({ key: k, value: String(v) }))
         : [emptyHeader()],
-      excludedModelsText: '',
+      excludedModelsText: stripDisableAllRule(codex?.excludedModels).join('\n'),
       testModel: '',
       apiKeyEntries: cfg.apiKeyEntries?.length
         ? cfg.apiKeyEntries.map((entry) => ({
@@ -228,7 +231,11 @@ export function BaseProviderForm({
   onDirtyChange,
 }: BaseProviderFormProps) {
   const { t } = useTranslation();
-  const descriptor = PROVIDER_DESCRIPTORS[brand];
+  const descriptor = resource?.flags.singleCodex
+    ? { ...PROVIDER_DESCRIPTORS[brand], supportsName: false, supportsApiKey: true, supportsApiKeyEntries: false }
+    : brand === 'codex'
+      ? { ...PROVIDER_DESCRIPTORS[brand], supportsWebsockets: false }
+      : PROVIDER_DESCRIPTORS[brand];
   const fid = useId();
   const [form, setForm] = useState<ProviderEntryFormInput>(() =>
     buildInitialForm(brand, resource, mode)
@@ -394,10 +401,9 @@ export function BaseProviderForm({
       return t('providersPage.form.validation.baseUrlRequired');
     }
     const weights = [
-      ...(brand === 'openaiCompatibility'
+      ...(descriptor.supportsApiKeyEntries
         ? (form.apiKeyEntries ?? []).map((entry) => entry.weight)
-        : []),
-      ...(brand !== 'openaiCompatibility' ? [form.weight] : []),
+        : [form.weight]),
     ];
     if (weights.some((weight) => weight !== undefined && !Number.isSafeInteger(weight))) {
       return t('providersPage.form.validation.weightInteger');
@@ -732,12 +738,14 @@ export function BaseProviderForm({
         ) : null}
       </div>
 
-      <ProviderBehaviorEditor
-        brand={brand}
-        value={form}
-        onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-        disabled={mutating}
-      />
+      {brand !== 'codex' || resource?.flags.singleCodex ? (
+        <ProviderBehaviorEditor
+          brand={brand}
+          value={form}
+          onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+          disabled={mutating}
+        />
+      ) : null}
       <RuntimePolicyEditor
         value={form.runtimePolicy ?? readRuntimePolicy()}
         onChange={(value) => updateField('runtimePolicy', value)}

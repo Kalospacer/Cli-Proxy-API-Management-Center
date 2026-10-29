@@ -66,11 +66,11 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
   codex: {
     id: 'codex',
     supportsRequestScopedErrors: true,
-    supportsName: false,
-    supportsApiKey: true,
+    supportsName: true,
+    supportsApiKey: false,
     supportsDisabled: true,
     supportsBaseUrl: true,
-    baseUrlRequired: true,
+    baseUrlRequired: false,
     supportsProxyUrl: true,
     supportsPrefix: true,
     supportsModels: true,
@@ -80,7 +80,7 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsTestModel: true,
     supportsWebsockets: true,
     supportsCloak: false,
-    supportsApiKeyEntries: false,
+    supportsApiKeyEntries: true,
     sheetSize: 'md',
   },
   meta: {

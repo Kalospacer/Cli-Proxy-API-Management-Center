@@ -3,6 +3,8 @@ import { Collapsible } from '@/components/ui/Collapsible';
 import { IconCheck, IconX } from '@/components/ui/icons';
 import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
+import type { CodexProviderGroupConfig } from '@/types/provider';
+import { codexToResource } from '../adapters';
 import { maskApiKey } from '@/utils/format';
 import {
   getSponsorProviderDefinition,
@@ -16,6 +18,8 @@ import styles from './forms/sharedForm.module.scss';
 interface ResourceDetailViewProps {
   resource: ProviderResource;
   usageByProvider?: ProviderRecentUsageMap;
+  onEditKey?: (resource: ProviderResource) => void;
+  mutationDisabled?: boolean;
 }
 
 const sponsorProtocolEntryKey = (protocol: string): string => {
@@ -24,7 +28,7 @@ const sponsorProtocolEntryKey = (protocol: string): string => {
   return `${protocol}Entries`;
 };
 
-export function ResourceDetailView({ resource, usageByProvider }: ResourceDetailViewProps) {
+export function ResourceDetailView({ resource, usageByProvider, onEditKey, mutationDisabled }: ResourceDetailViewProps) {
   const { t } = useTranslation();
 
   if (isMultiProtocolSponsorBrand(resource.brand)) {
@@ -117,7 +121,9 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
   ];
 
   const openaiConfig =
-    resource.brand === 'openaiCompatibility' ? (resource.raw as OpenAIProviderConfig) : null;
+    resource.brand === 'openaiCompatibility' || resource.brand === 'codex'
+      ? (resource.raw as OpenAIProviderConfig)
+      : null;
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
 
   return (
@@ -142,10 +148,17 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
           </div>
           <div className={styles.apiKeyEntryList}>
             {apiKeyEntries.map((entry, entryIndex) => {
-              const entryStats = usageByProvider
+              const member = resource.brand === 'codex'
+                ? (resource.raw as CodexProviderGroupConfig).members.find(
+                    (item) => item.source?.keyIndex === entry.sourceIndex
+                  )
+                : undefined;
+              const ambiguousStats = resource.brand === 'codex' &&
+                apiKeyEntries.some((other, index) => index !== entryIndex && other.apiKey === entry.apiKey);
+              const entryStats = usageByProvider && !ambiguousStats
                 ? getProviderTotalStats(
                     usageByProvider,
-                    openaiConfig.name,
+                    resource.brand === 'codex' ? 'codex' : openaiConfig.name,
                     entry.apiKey,
                     openaiConfig.baseUrl
                   )
@@ -154,17 +167,29 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                 <div key={`${entry.apiKey}-${entryIndex}`} className={styles.apiKeyEntryCard}>
                   <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
                   <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
+                  {member && onEditKey ? (
+                    <button
+                      type="button"
+                      className={styles.connectivityBtnGhost}
+                      disabled={mutationDisabled}
+                      onClick={() => onEditKey(codexToResource(member, entryIndex))}
+                    >
+                      {t('providersPage.actions.edit')}
+                    </button>
+                  ) : null}
                   {entry.proxyUrl ? (
                     <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
                   ) : null}
-                  <div className={styles.apiKeyEntryStats}>
-                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}>
-                      <IconCheck size={12} /> {entryStats.success}
-                    </span>
-                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}>
-                      <IconX size={12} /> {entryStats.failure}
-                    </span>
-                  </div>
+                  {!ambiguousStats ? (
+                    <div className={styles.apiKeyEntryStats}>
+                      <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}>
+                        <IconCheck size={12} /> {entryStats.success}
+                      </span>
+                      <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}>
+                        <IconX size={12} /> {entryStats.failure}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

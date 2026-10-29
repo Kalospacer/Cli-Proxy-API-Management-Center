@@ -185,7 +185,7 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility') return false;
+      if (brand !== 'openaiCompatibility' && brand !== 'codex') return false;
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -195,7 +195,9 @@ export function useConnectivityTest(
         });
         return false;
       }
-      const endpoint = buildOpenAIChatCompletionsEndpoint(trimmedBase);
+      const endpoint = brand === 'codex'
+        ? buildCodexResponsesEndpoint(trimmedBase)
+        : buildOpenAIChatCompletionsEndpoint(trimmedBase);
       if (!endpoint) {
         updateOpenaiStatus(idx, {
           state: 'error',
@@ -241,16 +243,15 @@ export function useConnectivityTest(
         const result = await apiCallApi.request(
           {
             authIndex: resolvedAuthIndex,
-            proxy_url: entry?.proxyUrl?.trim() || undefined,
+            proxy_url: entry?.proxyUrl?.trim() || (brand === 'codex' ? proxyUrl?.trim() : undefined) || undefined,
             method: 'POST',
             url: endpoint,
             header: headerObj,
-            data: JSON.stringify({
-              model,
-              messages: [{ role: 'user', content: 'Hi' }],
-              stream: false,
-              max_tokens: 5,
-            }),
+            data: JSON.stringify(
+              brand === 'codex'
+                ? { model, input: 'Hi', stream: false }
+                : { model, messages: [{ role: 'user', content: 'Hi' }], stream: false, max_tokens: 5 }
+            ),
           },
           { timeout: DEFAULT_TIMEOUT_MS }
         );
@@ -277,13 +278,14 @@ export function useConnectivityTest(
       formHeaders,
       messages,
       models,
+      proxyUrl,
       testModel,
       updateOpenaiStatus,
     ]
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility') return;
+    if (brand !== 'openaiCompatibility' && brand !== 'codex') return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
@@ -311,11 +313,16 @@ export function useConnectivityTest(
     }
 
     const customHeaders = buildHeaderObject(formHeaders);
+    const firstEntry = brand === 'codex'
+      ? (apiKeyEntries ?? []).find((entry) =>
+          entry.apiKey.trim() || entry.existingApiKey?.trim() || entry.authIndex?.trim()
+        )
+      : undefined;
     const explicitKey = (apiKey ?? '').trim();
     const persistedKey = (fallbackApiKey ?? '').trim();
     const hasAuthorization = hasHeader(customHeaders, 'authorization');
-    const resolvedKey = explicitKey || persistedKey;
-    const resolvedAuthIndex = (authIndex ?? '').trim() || undefined;
+    const resolvedKey = explicitKey || persistedKey || firstEntry?.apiKey.trim() || firstEntry?.existingApiKey?.trim();
+    const resolvedAuthIndex = firstEntry?.authIndex?.trim() || (authIndex ?? '').trim() || undefined;
 
     if (!resolvedKey && !hasAuthorization && !resolvedAuthIndex) {
       setCodexStatus({ state: 'error', message: messages.apiKeyRequired });
@@ -340,7 +347,7 @@ export function useConnectivityTest(
       const result = await apiCallApi.request(
         {
           authIndex: resolvedAuthIndex,
-          proxy_url: proxyUrl?.trim() || undefined,
+          proxy_url: firstEntry?.proxyUrl?.trim() || proxyUrl?.trim() || undefined,
           method: 'POST',
           url: endpoint,
           header: headerObj,
@@ -366,6 +373,7 @@ export function useConnectivityTest(
     }
   }, [
     apiKey,
+    apiKeyEntries,
     authIndex,
     baseUrl,
     brand,

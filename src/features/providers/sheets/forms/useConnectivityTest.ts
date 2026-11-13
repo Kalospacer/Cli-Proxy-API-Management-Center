@@ -3,9 +3,11 @@ import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
 import {
   buildCodexResponsesEndpoint,
   buildClaudeMessagesEndpoint,
+  buildGeminiDecisionsEndpoint,
   buildGeminiGenerateContentEndpoint,
   buildInteractionsEndpoint,
   buildInteractionsProbePayload,
+  buildOpenAIDecisionsEndpoint,
   INTERACTIONS_API_REVISION,
   buildOpenAIChatCompletionsEndpoint,
 } from '@/components/providers/utils';
@@ -292,21 +294,26 @@ export function useConnectivityTest(
   }, [apiKeyEntries, brand, runOpenAIKey]);
 
   const runCodex = useCallback(async (): Promise<void> => {
-    if (brand !== 'codex' && brand !== 'meta' && brand !== 'xai') return;
+    if (brand !== 'codex' && brand !== 'meta' && brand !== 'xai' && brand !== 'decisionOpenAI')
+      return;
 
     const trimmedBase = baseUrl.trim();
-    if (!trimmedBase) {
+    if (!trimmedBase && brand !== 'decisionOpenAI') {
       setCodexStatus({ state: 'error', message: messages.baseUrlRequired });
       return;
     }
 
-    const endpoint = buildCodexResponsesEndpoint(trimmedBase);
+    const endpoint =
+      brand === 'decisionOpenAI'
+        ? buildOpenAIDecisionsEndpoint(trimmedBase)
+        : buildCodexResponsesEndpoint(trimmedBase);
     if (!endpoint) {
       setCodexStatus({ state: 'error', message: messages.endpointInvalid });
       return;
     }
 
-    const model = pickModel(testModel, models);
+    const model =
+      pickModel(testModel, models) || (brand === 'decisionOpenAI' ? 'gpt-6-luna-decision' : '');
     if (!model) {
       setCodexStatus({ state: 'error', message: messages.modelRequired });
       return;
@@ -351,11 +358,19 @@ export function useConnectivityTest(
           method: 'POST',
           url: endpoint,
           header: headerObj,
-          data: JSON.stringify({
-            model,
-            input: 'Hi',
-            stream: false,
-          }),
+          data: JSON.stringify(
+            brand === 'decisionOpenAI'
+              ? {
+                  model,
+                  input: 'ping',
+                  questions: [{ type: 'predicate', name: 'ok', instructions: 'Reply yes.' }],
+                }
+              : {
+                  model,
+                  input: 'Hi',
+                  stream: false,
+                }
+          ),
         },
         { timeout: DEFAULT_TIMEOUT_MS }
       );
@@ -386,18 +401,21 @@ export function useConnectivityTest(
   ]);
 
   const runGemini = useCallback(async (): Promise<void> => {
-    if (brand !== 'gemini' && brand !== 'interactions') return;
+    if (brand !== 'gemini' && brand !== 'interactions' && brand !== 'decisionGemini') return;
 
-    const model = pickModel(testModel, models);
+    const model =
+      pickModel(testModel, models) || (brand === 'decisionGemini' ? 'gemini-decision-1' : '');
     if (!model) {
       setGeminiStatus({ state: 'error', message: messages.modelRequired });
       return;
     }
 
     const endpoint =
-      brand === 'interactions'
-        ? buildInteractionsEndpoint(baseUrl ?? '')
-        : buildGeminiGenerateContentEndpoint(baseUrl ?? '', model);
+      brand === 'decisionGemini'
+        ? buildGeminiDecisionsEndpoint(baseUrl ?? '')
+        : brand === 'interactions'
+          ? buildInteractionsEndpoint(baseUrl ?? '')
+          : buildGeminiGenerateContentEndpoint(baseUrl ?? '', model);
     if (!endpoint) {
       setGeminiStatus({ state: 'error', message: messages.endpointInvalid });
       return;
@@ -441,12 +459,18 @@ export function useConnectivityTest(
           url: endpoint,
           header: headerObj,
           data: JSON.stringify(
-            brand === 'interactions'
-              ? buildInteractionsProbePayload(model)
-              : {
-                  contents: [{ parts: [{ text: 'Hi' }] }],
-                  generationConfig: { maxOutputTokens: 8 },
+            brand === 'decisionGemini'
+              ? {
+                  model,
+                  input: 'ping',
+                  questions: { ok: { type: 'noul', instructions: 'Reply yes.' } },
                 }
+              : brand === 'interactions'
+                ? buildInteractionsProbePayload(model)
+                : {
+                    contents: [{ parts: [{ text: 'Hi' }] }],
+                    generationConfig: { maxOutputTokens: 8 },
+                  }
           ),
         },
         { timeout: DEFAULT_TIMEOUT_MS }

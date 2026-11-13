@@ -112,6 +112,30 @@ export const buildInteractionsEndpoint = (baseUrl: string): string => {
   return `${root}/v1beta/interactions`;
 };
 
+export const buildOpenAIDecisionsEndpoint = (baseUrl: string): string => {
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl, 'https://api.openai.com');
+  if (!trimmed) return '';
+  if (/\/(?:v1\/)?decisions$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/\/v1$/i.test(trimmed)) {
+    return `${trimmed}/decisions`;
+  }
+  return `${trimmed}/v1/decisions`;
+};
+
+export const buildGeminiDecisionsEndpoint = (baseUrl: string): string => {
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl, DEFAULT_GEMINI_BASE_URL);
+  if (!trimmed) return '';
+  if (/\/(?:v1beta\/)?decisions$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/\/v1beta$/i.test(trimmed)) {
+    return `${trimmed}/decisions`;
+  }
+  return `${trimmed}/v1beta/decisions`;
+};
+
 export const buildGeminiGenerateContentEndpoint = (baseUrl: string, model: string): string => {
   const resource = buildGeminiModelResource(model);
   if (!resource) return '';
@@ -135,6 +159,8 @@ export const buildGeminiGenerateContentEndpoint = (baseUrl: string, model: strin
 
 export const getProviderUsageKey = (provider: string): string => {
   if (provider === 'interactions') return 'gemini-interactions';
+  if (provider === 'decisionOpenAI') return 'decision-openai';
+  if (provider === 'decisionGemini') return 'decision-gemini';
   return provider;
 };
 

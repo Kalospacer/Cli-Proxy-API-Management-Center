@@ -4,6 +4,8 @@ import { TRAFFIC_BUCKET_MINUTES } from './types';
 const PROVIDER_LABELS: Record<string, string> = {
   gemini: 'Gemini',
   'gemini-interactions': 'Interactions API',
+  'decision-gemini': 'Gemini Decisions',
+  'decision-openai': 'OpenAI Decisions',
   aistudio: 'AI Studio',
   codex: 'Codex',
   claude: 'Claude',

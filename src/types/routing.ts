@@ -21,7 +21,9 @@ export const ROUTING_STRATEGIES: readonly RoutingStrategy[] = [
 export const ROUTING_KEY_FAMILIES = [
   'gemini',
   'interactions',
+  'decision-gemini',
   'codex',
+  'decision-openai',
   'meta',
   'xai',
   'claude',

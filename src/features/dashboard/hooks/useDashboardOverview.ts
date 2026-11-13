@@ -94,7 +94,9 @@ const createAccumulator = (): ProviderAccumulator => ({
 export const getProviderKeyCounts = (config: Config) => ({
   gemini: config.geminiApiKeys?.length ?? 0,
   interactions: config.interactionsApiKeys?.length ?? 0,
+  decisionGemini: config.decisionGeminiApiKeys?.length ?? 0,
   codex: config.codexApiKeys?.length ?? 0,
+  decisionOpenAI: config.decisionOpenAIApiKeys?.length ?? 0,
   meta: config.metaApiKeys?.length ?? 0,
   xai: config.xaiApiKeys?.length ?? 0,
   claude: config.claudeApiKeys?.length ?? 0,

@@ -30,8 +30,10 @@ export type ProviderBrandLogoKey = ProviderBrand | 'devin';
 export const PROVIDER_LOGOS: Record<ProviderBrandLogoKey, ProviderBrandLogo> = {
   gemini: { src: geminiLogo },
   interactions: { src: geminiLogo },
+  decisionGemini: { src: geminiLogo },
   claude: { src: claudeLogo },
   codex: { src: codexLogo },
+  decisionOpenAI: { src: openaiLightLogo, darkSrc: openaiDarkLogo, transparent: true },
   meta: { src: metaLogo, transparent: true },
   devin: { src: devinLightLogo, darkSrc: devinDarkLogo, transparent: true },
   xai: { src: xaiLightLogo, darkSrc: xaiDarkLogo, transparent: true },

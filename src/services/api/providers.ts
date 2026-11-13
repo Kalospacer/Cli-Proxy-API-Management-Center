@@ -211,7 +211,9 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
 export type ProviderFamily =
   | 'gemini'
   | 'interactions'
+  | 'decision-gemini'
   | 'codex'
+  | 'decision-openai'
   | 'meta'
   | 'xai'
   | 'claude'
@@ -526,6 +528,22 @@ export const providersApi = {
     updateKey('interactions', apiKey, baseUrl, config),
   deleteInteractionsKey: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
     deleteKey('interactions', apiKey, baseUrl, source),
+  createDecisionGeminiConfig: (config: ProviderKeyConfig) => createKey('decision-gemini', config),
+  updateDecisionGeminiConfig: (
+    apiKey: string,
+    baseUrl: string | undefined,
+    config: ProviderKeyConfig
+  ) => updateKey('decision-gemini', apiKey, baseUrl, config),
+  deleteDecisionGeminiConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
+    deleteKey('decision-gemini', apiKey, baseUrl, source),
+  createDecisionOpenAIConfig: (config: ProviderKeyConfig) => createKey('decision-openai', config),
+  updateDecisionOpenAIConfig: (
+    apiKey: string,
+    baseUrl: string | undefined,
+    config: ProviderKeyConfig
+  ) => updateKey('decision-openai', apiKey, baseUrl, config),
+  deleteDecisionOpenAIConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
+    deleteKey('decision-openai', apiKey, baseUrl, source),
   async createCodexGroup(config: OpenAIProviderConfig) {
     const groups = await getGroups('codex');
     const group = serializeOpenAIGroup(config);

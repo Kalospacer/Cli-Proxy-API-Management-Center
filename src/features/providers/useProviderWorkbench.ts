@@ -20,6 +20,8 @@ import {
   apiKeyFunToResource,
   claudeToResource,
   codexToResource,
+  decisionGeminiToResource,
+  decisionOpenAIToResource,
   fennoAIToResource,
   geminiToResource,
   interactionsToResource,
@@ -157,7 +159,16 @@ const buildModelAliases = (
     .filter((m) => m.name);
 
 const buildProviderKeyConfig = (
-  brand: 'gemini' | 'interactions' | 'codex' | 'meta' | 'xai' | 'claude' | 'vertex',
+  brand:
+    | 'gemini'
+    | 'interactions'
+    | 'decisionGemini'
+    | 'codex'
+    | 'decisionOpenAI'
+    | 'meta'
+    | 'xai'
+    | 'claude'
+    | 'vertex',
   input: ProviderEntryFormInput,
   existing?: ProviderKeyConfig | GeminiKeyConfig | null
 ): ProviderKeyConfig | GeminiKeyConfig => {
@@ -401,6 +412,16 @@ export const buildProviderGroups = (config: Config): ProviderGroup[] =>
       case 'interactions':
         resources = (config.interactionsApiKeys ?? []).map((item, index) =>
           interactionsToResource(item, index)
+        );
+        break;
+      case 'decisionGemini':
+        resources = (config.decisionGeminiApiKeys ?? []).map((item, index) =>
+          decisionGeminiToResource(item, index)
+        );
+        break;
+      case 'decisionOpenAI':
+        resources = (config.decisionOpenAIApiKeys ?? []).map((item, index) =>
+          decisionOpenAIToResource(item, index)
         );
         break;
       case 'codex':
@@ -715,6 +736,14 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           await providersApi.createInteractionsKey(
             buildProviderKeyConfig('interactions', input) as GeminiKeyConfig
           );
+        } else if (brand === 'decisionGemini') {
+          await providersApi.createDecisionGeminiConfig(
+            buildProviderKeyConfig('decisionGemini', input) as ProviderKeyConfig
+          );
+        } else if (brand === 'decisionOpenAI') {
+          await providersApi.createDecisionOpenAIConfig(
+            buildProviderKeyConfig('decisionOpenAI', input) as ProviderKeyConfig
+          );
         } else if (brand === 'codex') {
           await providersApi.createCodexGroup(buildOpenAIConfig(input, null, 'codex'));
         } else if (brand === 'meta') {
@@ -771,6 +800,20 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             selector.apiKey,
             selector.baseUrl,
             buildProviderKeyConfig('interactions', input, existing) as GeminiKeyConfig
+          );
+        } else if (brand === 'decisionGemini' && selector.brand === 'decisionGemini') {
+          const existing = resource.raw as ProviderKeyConfig;
+          await providersApi.updateDecisionGeminiConfig(
+            selector.apiKey,
+            selector.baseUrl,
+            buildProviderKeyConfig('decisionGemini', input, existing) as ProviderKeyConfig
+          );
+        } else if (brand === 'decisionOpenAI' && selector.brand === 'decisionOpenAI') {
+          const existing = resource.raw as ProviderKeyConfig;
+          await providersApi.updateDecisionOpenAIConfig(
+            selector.apiKey,
+            selector.baseUrl,
+            buildProviderKeyConfig('decisionOpenAI', input, existing) as ProviderKeyConfig
           );
         } else if (brand === 'codex' && selector.brand === 'codex') {
           if (resource.flags.singleCodex) {
@@ -859,6 +902,22 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           );
           const next = (config?.interactionsApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('interactions-api-key', next);
+        } else if (sel.brand === 'decisionGemini') {
+          await providersApi.deleteDecisionGeminiConfig(
+            sel.apiKey,
+            sel.baseUrl,
+            (resource.raw as ProviderKeyConfig).source
+          );
+          const next = (config?.decisionGeminiApiKeys ?? []).filter((_, i) => i !== sel.index);
+          updateConfigValue('decision-gemini-api-key', next);
+        } else if (sel.brand === 'decisionOpenAI') {
+          await providersApi.deleteDecisionOpenAIConfig(
+            sel.apiKey,
+            sel.baseUrl,
+            (resource.raw as ProviderKeyConfig).source
+          );
+          const next = (config?.decisionOpenAIApiKeys ?? []).filter((_, i) => i !== sel.index);
+          updateConfigValue('decision-openai-api-key', next);
         } else if (sel.brand === 'codex') {
           if (resource.flags.singleCodex) {
             await providersApi.deleteCodexConfig(
@@ -987,6 +1046,8 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           await providersApi.updateCodexGroup(resource.raw as OpenAIProviderConfig, disabled);
         } else if (
           (brand === 'codex' && selector.brand === 'codex') ||
+          (brand === 'decisionOpenAI' && selector.brand === 'decisionOpenAI') ||
+          (brand === 'decisionGemini' && selector.brand === 'decisionGemini') ||
           (brand === 'meta' && selector.brand === 'meta') ||
           (brand === 'xai' && selector.brand === 'xai') ||
           (brand === 'claude' && selector.brand === 'claude') ||
@@ -999,6 +1060,10 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           const next = { ...current, excludedModels: excluded };
           if (selector.brand === 'codex') {
             await providersApi.updateCodexConfig(selector.apiKey, selector.baseUrl, next);
+          } else if (selector.brand === 'decisionOpenAI') {
+            await providersApi.updateDecisionOpenAIConfig(selector.apiKey, selector.baseUrl, next);
+          } else if (selector.brand === 'decisionGemini') {
+            await providersApi.updateDecisionGeminiConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'meta') {
             await providersApi.updateMetaConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'xai') {

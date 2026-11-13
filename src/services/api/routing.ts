@@ -33,7 +33,9 @@ const DISABLE_ALL_MODELS_RULE = '*';
 const KEY_FAMILY_CHANNELS: Record<RoutingKeyFamily, string> = {
   gemini: 'gemini',
   interactions: 'gemini-interactions',
+  'decision-gemini': 'decision-gemini',
   codex: 'codex',
+  'decision-openai': 'decision-openai',
   meta: 'meta',
   xai: 'xai',
   claude: 'claude',

@@ -1,15 +1,46 @@
-# Native decision API clients
+# Native decision APIs
 
-CLIProxyAPI serves three independent, unmodified decision protocols. The Management Center continues to manage their existing TypeSafe, Codex, and Gemini credential groups; no new provider family is introduced.
+CLIProxyAPI exposes three independent decision protocols. It forwards each request body and response unchanged; it does not translate JEV, OpenAI, and Gemini into one another. These APIs are not chat endpoints and do not support streaming.
 
-| Protocol | Client endpoint | Existing credential group |
-| --- | --- | --- |
-| TypeSafe JEV | `POST /v1/systemone` | `api-keys.typesafe` |
-| OpenAI Decisions | `POST /v1/decisions` | `api-keys.codex` with an official `api.openai.com` API key |
-| Gemini Decisions | `POST /v1beta/decisions` | `api-keys.gemini` with an official `generativelanguage.googleapis.com` API key |
+| Provider | Downstream endpoint | Upstream endpoint | v8 credential family |
+| --- | --- | --- | --- |
+| TypeSafe JEV | `POST /v1/systemone` | `POST {base-url}/v1/systemone` | `api-keys.typesafe` |
+| OpenAI Decisions | `POST /v1/decisions` or `POST /openai/v1/decisions` | `POST https://api.openai.com/v1/decisions` | `api-keys.decision-openai` |
+| Gemini Decisions | `POST /v1beta/decisions` | `POST https://generativelanguage.googleapis.com/v1beta/decisions` | `api-keys.decision-gemini` |
 
-OpenAI's `/openai/v1/decisions` alias is also supported. Decision models are specialized non-chat endpoints: they do not need a chat model declaration or a standard connectivity probe. Third-party Codex groups, OAuth credentials, and Gemini's OpenAI-compatible chat endpoint are not eligible for native Decisions forwarding.
+Each decision protocol has its own v8 credential family (`api-keys.decision-openai` and `api-keys.decision-gemini`) and dedicated management card (`OpenAI Decisions` and `Gemini Decisions`), isolated from ordinary Codex and Gemini chat credentials.
 
-Clients authenticate to CLIProxyAPI with its ordinary downstream API key. The proxy supplies the selected upstream credential and returns the provider's native response, including `401`, `403`, `429`, and `5xx` credential rotation. JEV keeps its special `detail.error_type=authentication_error` handling for `403`.
+## OpenAI example
 
-The backend implementation and request examples are documented in `docs/decisions-api.md` in the CLIProxyAPI repository.
+```bash
+curl -X POST "http://127.0.0.1:8317/v1/decisions" \
+  -H "Authorization: Bearer CPA_CLIENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-6-luna-decision",
+    "input": "I was charged twice for my order.",
+    "questions": [{
+      "type": "predicate",
+      "name": "refund_requested",
+      "instructions": "Does the customer ask for a refund?"
+    }]
+  }'
+```
+
+## Gemini example
+
+```bash
+curl -X POST "http://127.0.0.1:8317/v1beta/decisions" \
+  -H "Authorization: Bearer CPA_CLIENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-decision-1",
+    "input": "The blue mug I ordered on Monday arrived cracked on Wednesday.",
+    "questions": {
+      "is_damaged": {
+        "type": "noul",
+        "instructions": "Did the item arrive damaged?"
+      }
+    }
+  }'
+```

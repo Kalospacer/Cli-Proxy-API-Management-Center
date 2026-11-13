@@ -106,11 +106,13 @@ function buildInitialForm(
       testModel:
         brand === 'openaiCompatibility' ||
         brand === 'codex' ||
+        brand === 'decisionOpenAI' ||
         brand === 'meta' ||
         brand === 'xai' ||
         isClaudeLikeBrand(brand) ||
         brand === 'gemini' ||
-        brand === 'interactions'
+        brand === 'interactions' ||
+        brand === 'decisionGemini'
           ? ''
           : undefined,
       apiKeyEntries:
@@ -212,11 +214,13 @@ function buildInitialForm(
       : undefined,
     testModel:
       brand === 'codex' ||
+      brand === 'decisionOpenAI' ||
       brand === 'meta' ||
       brand === 'xai' ||
       isClaudeLikeBrand(brand) ||
       brand === 'gemini' ||
-      brand === 'interactions'
+      brand === 'interactions' ||
+      brand === 'decisionGemini'
         ? ''
         : undefined,
   };
@@ -480,9 +484,9 @@ export function BaseProviderForm({
   const actualApiKeyEntries = form.apiKeyEntries ?? [];
   const supportsModelImage = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'codex' || brand === 'meta' || brand === 'xai'
+    brand === 'codex' || brand === 'decisionOpenAI' || brand === 'meta' || brand === 'xai'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
-      : brand === 'gemini' || brand === 'interactions'
+      : brand === 'gemini' || brand === 'interactions' || brand === 'decisionGemini'
         ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
         : isClaudeLikeBrand(brand)
           ? { status: connectivity.claudeStatus, run: connectivity.runClaude }
@@ -579,7 +583,13 @@ export function BaseProviderForm({
               className={styles.input}
               value={form.baseUrl}
               onChange={(e) => updateField('baseUrl', e.target.value)}
-              placeholder="https://api.example.com"
+              placeholder={
+                brand === 'decisionOpenAI'
+                  ? 'https://api.openai.com'
+                  : brand === 'decisionGemini'
+                    ? 'https://generativelanguage.googleapis.com'
+                    : 'https://api.example.com'
+              }
               disabled={mutating}
             />
           </div>

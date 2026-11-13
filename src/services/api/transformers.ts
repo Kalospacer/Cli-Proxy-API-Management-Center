@@ -370,6 +370,12 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
   config.interactionsApiKeys = normalizeProviderGroups(
     at('api-keys.interactions')
   ) as ProviderKeyConfig[];
+  config.decisionGeminiApiKeys = normalizeProviderGroups(
+    at('api-keys.decision-gemini')
+  ) as ProviderKeyConfig[];
+  config.decisionOpenAIApiKeys = normalizeProviderGroups(
+    at('api-keys.decision-openai')
+  ) as ProviderKeyConfig[];
   config.codexApiKeys = normalizeProviderGroups(at('api-keys.codex')) as ProviderKeyConfig[];
   const codexGroups = at('api-keys.codex');
   config.codexProviderGroups = Array.isArray(codexGroups)

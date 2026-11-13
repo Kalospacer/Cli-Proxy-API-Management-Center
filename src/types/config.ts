@@ -24,7 +24,9 @@ export interface Config {
   apiKeys?: string[];
   geminiApiKeys?: GeminiKeyConfig[];
   interactionsApiKeys?: GeminiKeyConfig[];
+  decisionGeminiApiKeys?: ProviderKeyConfig[];
   codexApiKeys?: ProviderKeyConfig[];
+  decisionOpenAIApiKeys?: ProviderKeyConfig[];
   codexProviderGroups?: CodexProviderGroupConfig[];
   metaApiKeys?: ProviderKeyConfig[];
   xaiApiKeys?: ProviderKeyConfig[];
@@ -49,7 +51,9 @@ export type RawConfigSection =
   | 'api-keys'
   | 'gemini-api-key'
   | 'interactions-api-key'
+  | 'decision-gemini-api-key'
   | 'codex-api-key'
+  | 'decision-openai-api-key'
   | 'meta-api-key'
   | 'xai-api-key'
   | 'claude-api-key'

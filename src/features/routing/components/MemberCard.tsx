@@ -12,7 +12,9 @@ import styles from './MemberCard.module.scss';
 const FAMILY_BRANDS: Record<string, ProviderBrand> = {
   gemini: 'gemini',
   interactions: 'interactions',
+  'decision-gemini': 'decisionGemini',
   codex: 'codex',
+  'decision-openai': 'decisionOpenAI',
   meta: 'meta',
   xai: 'xai',
   claude: 'claude',

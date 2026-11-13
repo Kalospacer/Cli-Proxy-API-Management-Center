@@ -11,7 +11,9 @@ import type { ProviderBehaviorOptions } from '@/types/provider';
 export type ProviderBrand =
   | 'gemini'
   | 'interactions'
+  | 'decisionGemini'
   | 'codex'
+  | 'decisionOpenAI'
   | 'meta'
   | 'xai'
   | 'claude'
@@ -34,7 +36,9 @@ export type SortDir = (typeof SORT_DIR_VALUES)[number];
 export type ProviderResourceSelector =
   | { brand: 'gemini'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'interactions'; apiKey: string; baseUrl?: string; index: number }
+  | { brand: 'decisionGemini'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'codex'; apiKey: string; baseUrl?: string; index: number }
+  | { brand: 'decisionOpenAI'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'meta'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'xai'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }

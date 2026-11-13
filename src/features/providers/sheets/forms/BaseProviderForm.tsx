@@ -110,18 +110,7 @@ function buildInitialForm(
         ? { mode: '', strictMode: false, sensitiveWordsText: '', cacheUserId: false }
         : undefined,
       fingerprintProfile: isClaudeLikeBrand(brand) ? '' : undefined,
-      testModel:
-        brand === 'openaiCompatibility' ||
-        brand === 'codex' ||
-        brand === 'decisionOpenAI' ||
-        brand === 'meta' ||
-        brand === 'xai' ||
-        isClaudeLikeBrand(brand) ||
-        brand === 'gemini' ||
-        brand === 'interactions' ||
-        brand === 'decisionGemini'
-          ? ''
-          : undefined,
+      testModel: PROVIDER_DESCRIPTORS[brand].supportsTestModel ? '' : undefined,
       apiKeyEntries:
         brand === 'openaiCompatibility' || isGroupedKeyBrand(brand)
           ? [emptyApiKeyEntry()]
@@ -159,7 +148,7 @@ function buildInitialForm(
         ? Object.entries(cfg.headers).map(([k, v]) => ({ key: k, value: String(v) }))
         : [emptyHeader()],
       excludedModelsText: stripDisableAllRule(grouped?.excludedModels).join('\n'),
-      testModel: brand === 'typesafe' ? undefined : '',
+      testModel: PROVIDER_DESCRIPTORS[brand].supportsTestModel ? '' : undefined,
       apiKeyEntries: cfg.apiKeyEntries?.length
         ? cfg.apiKeyEntries.map((entry) => ({
             apiKey: '',
@@ -221,17 +210,7 @@ function buildInitialForm(
     fingerprintProfile: isClaudeLikeBrand(brand)
       ? ((cfg as ProviderKeyConfig).fingerprintProfile ?? '')
       : undefined,
-    testModel:
-      brand === 'codex' ||
-      brand === 'decisionOpenAI' ||
-      brand === 'meta' ||
-      brand === 'xai' ||
-      isClaudeLikeBrand(brand) ||
-      brand === 'gemini' ||
-      brand === 'interactions' ||
-      brand === 'decisionGemini'
-        ? ''
-        : undefined,
+    testModel: PROVIDER_DESCRIPTORS[brand].supportsTestModel ? '' : undefined,
   };
 }
 
@@ -503,13 +482,13 @@ export function BaseProviderForm({
   const actualApiKeyEntries = form.apiKeyEntries ?? [];
   const supportsModelImage = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'meta' || brand === 'xai' || (brand === 'codex' && resource?.flags.singleCodex)
+    brand === 'meta' ||
+    brand === 'xai' ||
+    ((brand === 'codex' || brand === 'decisionOpenAI') && resource?.flags.singleCodex)
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
-      : brand === 'decisionOpenAI' && resource?.flags.singleCodex
-        ? { status: connectivity.codexStatus, run: connectivity.runCodex }
-        : brand === 'gemini' ||
-            brand === 'interactions' ||
-            (brand === 'decisionGemini' && resource?.flags.singleCodex)
+      : brand === 'gemini' ||
+          brand === 'interactions' ||
+          (brand === 'decisionGemini' && resource?.flags.singleCodex)
           ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
           : isClaudeLikeBrand(brand)
             ? { status: connectivity.claudeStatus, run: connectivity.runClaude }
@@ -794,7 +773,7 @@ export function BaseProviderForm({
         >
           <ApiKeyEntriesEditor
             entries={apiKeyEntries}
-            allowTesting={brand !== 'typesafe'}
+            allowTesting={descriptor.supportsConnectivityTest !== false}
             removeDisabled={actualApiKeyEntries.length === 0}
             mutating={mutating}
             statuses={connectivity.openaiStatuses}

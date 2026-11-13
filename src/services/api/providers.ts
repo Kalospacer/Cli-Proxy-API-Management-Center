@@ -3,7 +3,7 @@ import { apiClient } from './client';
 import { guardConfigConnection } from './configValue';
 import { isRecord } from '@/utils/helpers';
 import { withDisableAllModelsRule, withoutDisableAllModelsRule } from '@/components/providers/utils';
-import { normalizeApiKeyEntry, normalizeConfigResponse, normalizeProviderGroups } from './transformers';
+import { normalizeApiKeyEntry, normalizeProviderGroupEntry, normalizeProviderGroups } from './transformers';
 import { serializeModelOptions } from './providerModels';
 import type {
   GeminiKeyConfig,
@@ -518,25 +518,30 @@ const findOpenAISource = (groups: Record<string, unknown>[], source?: ProviderSo
   return locateProviderGroup(groups, source);
 };
 
-type GroupedKeyFamily = 'codex' | 'decision-openai' | 'decision-gemini' | 'typesafe';
+export type GroupedKeyFamily = 'codex' | 'decision-openai' | 'decision-gemini' | 'typesafe';
 
-const groupedFamilyConfigKey = (
-  family: GroupedKeyFamily
-):
-  | 'codexProviderGroups'
-  | 'decisionOpenAIProviderGroups'
-  | 'decisionGeminiProviderGroups'
-  | 'typesafeProviderGroups' => {
-  switch (family) {
-    case 'decision-openai':
-      return 'decisionOpenAIProviderGroups';
-    case 'decision-gemini':
-      return 'decisionGeminiProviderGroups';
-    case 'typesafe':
-      return 'typesafeProviderGroups';
-    default:
-      return 'codexProviderGroups';
-  }
+// Existing form entries retain their source index; its absence means a new credential.
+// API keys alone are not identities: the same key can use different proxies.
+const rewriteGroupKeys = (
+  rawKeys: Record<string, unknown>[],
+  entries: ApiKeyEntry[]
+): Record<string, unknown>[] => {
+  const used = new Set<number>();
+  return entries.map((entry) => {
+    const keyIndex = entry.sourceIndex;
+    if (keyIndex === undefined) return serializeApiKeyEntry(entry);
+    if (used.has(keyIndex) || !isRecord(rawKeys[keyIndex])) throw conflict();
+    used.add(keyIndex);
+    const old = normalizeApiKeyEntry(rawKeys[keyIndex]);
+    if (!old) throw conflict();
+    const key = applyProviderChanges(
+      rawKeys[keyIndex],
+      serializeApiKeyEntry(old),
+      serializeApiKeyEntry(entry)
+    );
+    delete key['auth-index'];
+    return key;
+  });
 };
 
 const createKeyGroup = async (family: GroupedKeyFamily, config: OpenAIProviderConfig) => {
@@ -564,11 +569,8 @@ const updateKeyGroup = async (
   disabled?: boolean
 ) => {
   const groups = await getGroups(family);
-  if (!config.source) throw conflict();
-  const index = locateProviderGroup(groups, config.source);
-  const original = normalizeConfigResponse({ 'api-keys': { [family]: [groups[index]] } })[
-    groupedFamilyConfigKey(family)
-  ]?.[0];
+  const index = findOpenAISource(groups, config.source);
+  const original = normalizeProviderGroupEntry(groups[index], family, index, undefined, groups);
   if (!original) throw conflict();
   const before = serializeOpenAIGroup(original);
   const after = serializeOpenAIGroup(config);
@@ -597,23 +599,10 @@ const updateKeyGroup = async (
     (models) => serializeModelAliases(models)
   );
   if (!equal(before.keys, after.keys)) {
-    const rawKeys = groups[index].keys as Record<string, unknown>[];
-    const used = new Set<number>();
-    next.keys = config.apiKeyEntries.map((entry) => {
-      const keyIndex = entry.sourceIndex;
-      if (keyIndex === undefined) return serializeApiKeyEntry(entry);
-      if (used.has(keyIndex) || !isRecord(rawKeys[keyIndex])) throw conflict();
-      used.add(keyIndex);
-      const old = normalizeApiKeyEntry(rawKeys[keyIndex]);
-      if (!old) throw conflict();
-      const key = applyProviderChanges(
-        rawKeys[keyIndex],
-        serializeApiKeyEntry(old),
-        serializeApiKeyEntry(entry)
-      );
-      delete key['auth-index'];
-      return key;
-    });
+    next.keys = rewriteGroupKeys(
+      groups[index].keys as Record<string, unknown>[],
+      config.apiKeyEntries
+    );
   }
   if (disabled !== undefined) {
     const effectiveKeys = normalizeProviderGroups([next]) as ProviderKeyConfig[];
@@ -634,9 +623,8 @@ const updateKeyGroup = async (
 };
 
 const deleteKeyGroup = async (family: GroupedKeyFamily, source?: ProviderSource) => {
-  if (!source) throw conflict();
   const groups = await getGroups(family);
-  const index = locateProviderGroup(groups, source);
+  const index = findOpenAISource(groups, source);
   await putGroups(
     family,
     groups.filter((_, i) => i !== index)
@@ -644,6 +632,12 @@ const deleteKeyGroup = async (family: GroupedKeyFamily, source?: ProviderSource)
 };
 
 export const providersApi = {
+  createKey,
+  updateKey,
+  deleteKey,
+  createKeyGroup,
+  updateKeyGroup,
+  deleteKeyGroup,
   createGeminiKey: (config: GeminiKeyConfig) => createKey('gemini', config),
   updateGeminiKey: (apiKey: string, baseUrl: string | undefined, config: GeminiKeyConfig) =>
     updateKey('gemini', apiKey, baseUrl, config),
@@ -654,43 +648,6 @@ export const providersApi = {
     updateKey('interactions', apiKey, baseUrl, config),
   deleteInteractionsKey: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
     deleteKey('interactions', apiKey, baseUrl, source),
-  createDecisionGeminiConfig: (config: ProviderKeyConfig) => createKey('decision-gemini', config),
-  updateDecisionGeminiConfig: (
-    apiKey: string,
-    baseUrl: string | undefined,
-    config: ProviderKeyConfig
-  ) => updateKey('decision-gemini', apiKey, baseUrl, config),
-  deleteDecisionGeminiConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
-    deleteKey('decision-gemini', apiKey, baseUrl, source),
-  createDecisionGeminiGroup: (config: OpenAIProviderConfig) =>
-    createKeyGroup('decision-gemini', config),
-  updateDecisionGeminiGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
-    updateKeyGroup('decision-gemini', config, disabled),
-  deleteDecisionGeminiGroup: (source?: ProviderSource) =>
-    deleteKeyGroup('decision-gemini', source),
-  createDecisionOpenAIConfig: (config: ProviderKeyConfig) => createKey('decision-openai', config),
-  updateDecisionOpenAIConfig: (
-    apiKey: string,
-    baseUrl: string | undefined,
-    config: ProviderKeyConfig
-  ) => updateKey('decision-openai', apiKey, baseUrl, config),
-  deleteDecisionOpenAIConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
-    deleteKey('decision-openai', apiKey, baseUrl, source),
-  createDecisionOpenAIGroup: (config: OpenAIProviderConfig) =>
-    createKeyGroup('decision-openai', config),
-  updateDecisionOpenAIGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
-    updateKeyGroup('decision-openai', config, disabled),
-  deleteDecisionOpenAIGroup: (source?: ProviderSource) =>
-    deleteKeyGroup('decision-openai', source),
-  createTypeSafeConfig: (config: ProviderKeyConfig) => createKey('typesafe', config),
-  updateTypeSafeConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
-    updateKey('typesafe', apiKey, baseUrl, config),
-  deleteTypeSafeConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
-    deleteKey('typesafe', apiKey, baseUrl, source),
-  createTypeSafeGroup: (config: OpenAIProviderConfig) => createKeyGroup('typesafe', config),
-  updateTypeSafeGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
-    updateKeyGroup('typesafe', config, disabled),
-  deleteTypeSafeGroup: (source?: ProviderSource) => deleteKeyGroup('typesafe', source),
   createCodexGroup: (config: OpenAIProviderConfig) => createKeyGroup('codex', config),
   updateCodexGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
     updateKeyGroup('codex', config, disabled),
@@ -754,25 +711,10 @@ export const providersApi = {
       (models) => serializeModelAliases(models, true)
     );
     if (!equal(before.keys, after.keys)) {
-      const rawKeys = groups[index].keys as Record<string, unknown>[];
-      const used = new Set<number>();
-      next.keys = config.apiKeyEntries.map((entry) => {
-        // Existing form entries retain their source index; its absence means a new credential.
-        // API keys alone are not identities: the same key can use different proxies.
-        const keyIndex = entry.sourceIndex;
-        if (keyIndex === undefined) return serializeApiKeyEntry(entry);
-        if (used.has(keyIndex) || !isRecord(rawKeys[keyIndex])) throw conflict();
-        used.add(keyIndex);
-        const old = normalizeApiKeyEntry(rawKeys[keyIndex]);
-        if (!old) throw conflict();
-        const key = applyProviderChanges(
-          rawKeys[keyIndex],
-          serializeApiKeyEntry(old),
-          serializeApiKeyEntry(entry)
-        );
-        delete key['auth-index'];
-        return key;
-      });
+      next.keys = rewriteGroupKeys(
+        groups[index].keys as Record<string, unknown>[],
+        config.apiKeyEntries
+      );
     }
     groups[index] = next;
     await putGroups('openai-compatibility', groups);

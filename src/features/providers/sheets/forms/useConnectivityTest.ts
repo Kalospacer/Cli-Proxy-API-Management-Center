@@ -4,12 +4,16 @@ import {
   buildCodexResponsesEndpoint,
   buildClaudeMessagesEndpoint,
   buildGeminiDecisionsEndpoint,
+  buildGeminiDecisionsProbePayload,
   buildGeminiGenerateContentEndpoint,
   buildInteractionsEndpoint,
   buildInteractionsProbePayload,
   buildOpenAIDecisionsEndpoint,
+  buildOpenAIDecisionsProbePayload,
+  GEMINI_DECISIONS_PROBE_MODEL,
   INTERACTIONS_API_REVISION,
   buildOpenAIChatCompletionsEndpoint,
+  OPENAI_DECISIONS_PROBE_MODEL,
 } from '@/components/providers/utils';
 import { buildHeaderObject, hasHeader } from '@/utils/headers';
 import { getErrorMessage } from '@/utils/helpers';
@@ -234,9 +238,9 @@ export function useConnectivityTest(
       const model =
         pickModel(testModel, models) ||
         (brand === 'decisionOpenAI'
-          ? 'gpt-6-luna-decision'
+          ? OPENAI_DECISIONS_PROBE_MODEL
           : brand === 'decisionGemini'
-            ? 'gemini-decision-1'
+            ? GEMINI_DECISIONS_PROBE_MODEL
             : '');
       if (!model) {
         updateOpenaiStatus(idx, {
@@ -279,28 +283,21 @@ export function useConnectivityTest(
             method: 'POST',
             url: endpoint,
             header: headerObj,
-            data: JSON.stringify(
+            data:
               brand === 'decisionOpenAI'
-                ? {
-                    model,
-                    input: 'ping',
-                    questions: [{ type: 'predicate', name: 'ok', instructions: 'Reply yes.' }],
-                  }
+                ? buildOpenAIDecisionsProbePayload(model)
                 : brand === 'decisionGemini'
-                  ? {
-                      model,
-                      input: 'ping',
-                      questions: { ok: { type: 'noul', instructions: 'Reply yes.' } },
-                    }
-                  : brand === 'codex'
-                    ? { model, input: 'Hi', stream: false }
-                    : {
-                        model,
-                        messages: [{ role: 'user', content: 'Hi' }],
-                        stream: false,
-                        max_tokens: 5,
-                      }
-            ),
+                  ? buildGeminiDecisionsProbePayload(model)
+                  : JSON.stringify(
+                      brand === 'codex'
+                        ? { model, input: 'Hi', stream: false }
+                        : {
+                            model,
+                            messages: [{ role: 'user', content: 'Hi' }],
+                            stream: false,
+                            max_tokens: 5,
+                          }
+                    ),
           },
           { timeout: DEFAULT_TIMEOUT_MS }
         );
@@ -367,7 +364,8 @@ export function useConnectivityTest(
     }
 
     const model =
-      pickModel(testModel, models) || (brand === 'decisionOpenAI' ? 'gpt-6-luna-decision' : '');
+      pickModel(testModel, models) ||
+      (brand === 'decisionOpenAI' ? OPENAI_DECISIONS_PROBE_MODEL : '');
     if (!model) {
       setCodexStatus({ state: 'error', message: messages.modelRequired });
       return;
@@ -412,19 +410,10 @@ export function useConnectivityTest(
           method: 'POST',
           url: endpoint,
           header: headerObj,
-          data: JSON.stringify(
+          data:
             brand === 'decisionOpenAI'
-              ? {
-                  model,
-                  input: 'ping',
-                  questions: [{ type: 'predicate', name: 'ok', instructions: 'Reply yes.' }],
-                }
-              : {
-                  model,
-                  input: 'Hi',
-                  stream: false,
-                }
-          ),
+              ? buildOpenAIDecisionsProbePayload(model)
+              : JSON.stringify({ model, input: 'Hi', stream: false }),
         },
         { timeout: DEFAULT_TIMEOUT_MS }
       );
@@ -458,7 +447,8 @@ export function useConnectivityTest(
     if (brand !== 'gemini' && brand !== 'interactions' && brand !== 'decisionGemini') return;
 
     const model =
-      pickModel(testModel, models) || (brand === 'decisionGemini' ? 'gemini-decision-1' : '');
+      pickModel(testModel, models) ||
+      (brand === 'decisionGemini' ? GEMINI_DECISIONS_PROBE_MODEL : '');
     if (!model) {
       setGeminiStatus({ state: 'error', message: messages.modelRequired });
       return;
@@ -512,20 +502,17 @@ export function useConnectivityTest(
           method: 'POST',
           url: endpoint,
           header: headerObj,
-          data: JSON.stringify(
+          data:
             brand === 'decisionGemini'
-              ? {
-                  model,
-                  input: 'ping',
-                  questions: { ok: { type: 'noul', instructions: 'Reply yes.' } },
-                }
-              : brand === 'interactions'
-                ? buildInteractionsProbePayload(model)
-                : {
-                    contents: [{ parts: [{ text: 'Hi' }] }],
-                    generationConfig: { maxOutputTokens: 8 },
-                  }
-          ),
+              ? buildGeminiDecisionsProbePayload(model)
+              : JSON.stringify(
+                  brand === 'interactions'
+                    ? buildInteractionsProbePayload(model)
+                    : {
+                        contents: [{ parts: [{ text: 'Hi' }] }],
+                        generationConfig: { maxOutputTokens: 8 },
+                      }
+                ),
         },
         { timeout: DEFAULT_TIMEOUT_MS }
       );

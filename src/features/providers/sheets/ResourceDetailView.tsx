@@ -4,12 +4,7 @@ import { IconCheck, IconX } from '@/components/ui/icons';
 import { getProviderTotalStats, getProviderUsageKey, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
 import type { CodexProviderGroupConfig } from '@/types/provider';
-import {
-  codexToResource,
-  decisionGeminiToResource,
-  decisionOpenAIToResource,
-  typesafeToResource,
-} from '../adapters';
+import { codexToResource, groupedProviderKeyToResource } from '../adapters';
 import { isGroupedKeyBrand } from '../descriptors';
 import { maskApiKey } from '@/utils/format';
 import {
@@ -132,12 +127,10 @@ export function ResourceDetailView({ resource, usageByProvider, onEditKey, mutat
       ? (resource.raw as OpenAIProviderConfig)
       : null;
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
-  const memberToResource = (member: ProviderKeyConfig, idx: number): ProviderResource => {
-    if (resource.brand === 'decisionOpenAI') return decisionOpenAIToResource(member, idx);
-    if (resource.brand === 'decisionGemini') return decisionGeminiToResource(member, idx);
-    if (resource.brand === 'typesafe') return typesafeToResource(member, idx);
-    return codexToResource(member, idx);
-  };
+  const memberToResource = (member: ProviderKeyConfig, idx: number): ProviderResource =>
+    isGroupedKeyBrand(resource.brand)
+      ? groupedProviderKeyToResource(resource.brand, member, idx)
+      : codexToResource(member, idx);
 
   return (
     <div>

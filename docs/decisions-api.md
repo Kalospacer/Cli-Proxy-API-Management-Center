@@ -1,46 +1,23 @@
 # Native decision APIs
 
-CLIProxyAPI exposes three independent decision protocols. It forwards each request body and response unchanged; it does not translate JEV, OpenAI, and Gemini into one another. These APIs are not chat endpoints and do not support streaming.
+The management panel renders one card per native decision protocol. Each protocol keeps its own
+v8 credential family, so a decision credential never serves ordinary chat requests.
 
-| Provider | Downstream endpoint | Upstream endpoint | v8 credential family |
-| --- | --- | --- | --- |
-| TypeSafe JEV | `POST /v1/systemone` | `POST {base-url}/v1/systemone` | `api-keys.typesafe` |
-| OpenAI Decisions | `POST /v1/decisions` or `POST /openai/v1/decisions` | `POST https://api.openai.com/v1/decisions` | `api-keys.decision-openai` |
-| Gemini Decisions | `POST /v1beta/decisions` | `POST https://generativelanguage.googleapis.com/v1beta/decisions` | `api-keys.decision-gemini` |
+| Card | v8 credential family | Grouped multi-key |
+| --- | --- | --- |
+| `TypeSafe` (JEV SystemOne) | `api-keys.typesafe` | yes |
+| `OpenAI Decisions` | `api-keys.decision-openai` | yes |
+| `Gemini Decisions` | `api-keys.decision-gemini` | yes |
 
-Each decision protocol has its own v8 credential family (`api-keys.decision-openai` and `api-keys.decision-gemini`) and dedicated management card (`OpenAI Decisions` and `Gemini Decisions`), isolated from ordinary Codex and Gemini chat credentials.
+All four grouped-key cards (`codex`, `decisionOpenAI`, `decisionGemini`, `typesafe`) use the same
+editor: one `api-key-entries` row per credential, plus group-level base URL, proxy URL, prefix, and
+excluded models. `isGroupedKeyBrand()` in `src/features/providers/descriptors.ts` owns that rule;
+`GROUPED_FAMILY` in `useProviderWorkbench.ts` maps each card to its family key.
 
-## OpenAI example
+Connectivity tests send a protocol-shaped probe: OpenAI Decisions posts a `questions` array with
+`gpt-6-luna-decision`, Gemini Decisions posts a `questions` object with `gemini-decision-1` and
+`x-goog-api-key`. TypeSafe has no probe endpoint, so its card omits key testing
+(`supportsConnectivityTest: false`).
 
-```bash
-curl -X POST "http://127.0.0.1:8317/v1/decisions" \
-  -H "Authorization: Bearer CPA_CLIENT_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-6-luna-decision",
-    "input": "I was charged twice for my order.",
-    "questions": [{
-      "type": "predicate",
-      "name": "refund_requested",
-      "instructions": "Does the customer ask for a refund?"
-    }]
-  }'
-```
-
-## Gemini example
-
-```bash
-curl -X POST "http://127.0.0.1:8317/v1beta/decisions" \
-  -H "Authorization: Bearer CPA_CLIENT_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gemini-decision-1",
-    "input": "The blue mug I ordered on Monday arrived cracked on Wednesday.",
-    "questions": {
-      "is_damaged": {
-        "type": "noul",
-        "instructions": "Did the item arrive damaged?"
-      }
-    }
-  }'
-```
+Endpoint contracts, request bodies, credential selection, and free-tier quotas live in the backend
+repository: `docs/decisions-api.md` in CLIProxyAPI.

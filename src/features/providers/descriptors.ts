@@ -1,4 +1,4 @@
-import type { ProviderBrand } from './types';
+import type { GroupedKeyBrand, ProviderBrand } from './types';
 
 export interface ProviderDescriptor {
   id: ProviderBrand;
@@ -18,9 +18,31 @@ export interface ProviderDescriptor {
   supportsWebsockets: boolean;
   supportsCloak: boolean;
   supportsApiKeyEntries: boolean;
+  /** 未设置视为 true；typesafe 目前无可探测的连通性端点 */
+  supportsConnectivityTest?: boolean;
   /** Sheet 默认宽度 */
   sheetSize: 'md' | 'lg' | 'xl';
 }
+
+const groupedKeyDescriptor: Omit<ProviderDescriptor, 'id'> = {
+  supportsRequestScopedErrors: true,
+  supportsName: true,
+  supportsApiKey: false,
+  supportsDisabled: true,
+  supportsBaseUrl: true,
+  baseUrlRequired: false,
+  supportsProxyUrl: true,
+  supportsPrefix: true,
+  supportsModels: true,
+  supportsHeaders: true,
+  supportsExcludedModels: true,
+  supportsPriority: true,
+  supportsTestModel: true,
+  supportsWebsockets: false,
+  supportsCloak: false,
+  supportsApiKeyEntries: true,
+  sheetSize: 'md',
+};
 
 export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
   gemini: {
@@ -63,85 +85,15 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsApiKeyEntries: false,
     sheetSize: 'md',
   },
-  decisionGemini: {
-    id: 'decisionGemini',
-    supportsRequestScopedErrors: true,
-    supportsName: true,
-    supportsApiKey: false,
-    supportsDisabled: true,
-    supportsBaseUrl: true,
-    baseUrlRequired: false,
-    supportsProxyUrl: true,
-    supportsPrefix: true,
-    supportsModels: true,
-    supportsHeaders: true,
-    supportsExcludedModels: true,
-    supportsPriority: true,
-    supportsTestModel: true,
-    supportsWebsockets: false,
-    supportsCloak: false,
-    supportsApiKeyEntries: true,
-    sheetSize: 'md',
-  },
-  codex: {
-    id: 'codex',
-    supportsRequestScopedErrors: true,
-    supportsName: true,
-    supportsApiKey: false,
-    supportsDisabled: true,
-    supportsBaseUrl: true,
-    baseUrlRequired: false,
-    supportsProxyUrl: true,
-    supportsPrefix: true,
-    supportsModels: true,
-    supportsHeaders: true,
-    supportsExcludedModels: true,
-    supportsPriority: true,
-    supportsTestModel: true,
-    supportsWebsockets: true,
-    supportsCloak: false,
-    supportsApiKeyEntries: true,
-    sheetSize: 'md',
-  },
-  decisionOpenAI: {
-    id: 'decisionOpenAI',
-    supportsRequestScopedErrors: true,
-    supportsName: true,
-    supportsApiKey: false,
-    supportsDisabled: true,
-    supportsBaseUrl: true,
-    baseUrlRequired: false,
-    supportsProxyUrl: true,
-    supportsPrefix: true,
-    supportsModels: true,
-    supportsHeaders: true,
-    supportsExcludedModels: true,
-    supportsPriority: true,
-    supportsTestModel: true,
-    supportsWebsockets: false,
-    supportsCloak: false,
-    supportsApiKeyEntries: true,
-    sheetSize: 'md',
-  },
+  decisionGemini: { id: 'decisionGemini', ...groupedKeyDescriptor },
+  codex: { id: 'codex', ...groupedKeyDescriptor, supportsWebsockets: true },
+  decisionOpenAI: { id: 'decisionOpenAI', ...groupedKeyDescriptor },
   typesafe: {
     id: 'typesafe',
-    supportsRequestScopedErrors: true,
-    supportsName: true,
-    supportsApiKey: false,
-    supportsDisabled: true,
-    supportsBaseUrl: true,
+    ...groupedKeyDescriptor,
     baseUrlRequired: true,
-    supportsProxyUrl: true,
-    supportsPrefix: true,
-    supportsModels: true,
-    supportsHeaders: true,
-    supportsExcludedModels: true,
-    supportsPriority: true,
     supportsTestModel: false,
-    supportsWebsockets: false,
-    supportsCloak: false,
-    supportsApiKeyEntries: true,
-    sheetSize: 'md',
+    supportsConnectivityTest: false,
   },
   meta: {
     id: 'meta',
@@ -367,7 +319,7 @@ export const getProviderModelCapabilities = (brand: ProviderBrand): ProviderMode
   modalities: brand === 'openaiCompatibility',
 });
 
-export const isGroupedKeyBrand = (brand: ProviderBrand): boolean =>
+export const isGroupedKeyBrand = (brand: ProviderBrand): brand is GroupedKeyBrand =>
   brand === 'codex' ||
   brand === 'decisionOpenAI' ||
   brand === 'decisionGemini' ||

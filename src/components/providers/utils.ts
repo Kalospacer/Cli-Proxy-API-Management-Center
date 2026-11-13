@@ -112,29 +112,46 @@ export const buildInteractionsEndpoint = (baseUrl: string): string => {
   return `${root}/v1beta/interactions`;
 };
 
-export const buildOpenAIDecisionsEndpoint = (baseUrl: string): string => {
-  const trimmed = normalizeUpstreamBaseUrl(baseUrl, 'https://api.openai.com');
+const buildDecisionsEndpoint = (
+  baseUrl: string,
+  defaultBaseUrl: string,
+  version: 'v1' | 'v1beta'
+): string => {
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl, defaultBaseUrl);
   if (!trimmed) return '';
-  if (/\/(?:v1\/)?decisions$/i.test(trimmed)) {
+  if (new RegExp(`/(?:${version}/)?decisions$`, 'i').test(trimmed)) {
     return trimmed;
   }
-  if (/\/v1$/i.test(trimmed)) {
+  if (new RegExp(`/${version}$`, 'i').test(trimmed)) {
     return `${trimmed}/decisions`;
   }
-  return `${trimmed}/v1/decisions`;
+  return `${trimmed}/${version}/decisions`;
 };
 
-export const buildGeminiDecisionsEndpoint = (baseUrl: string): string => {
-  const trimmed = normalizeUpstreamBaseUrl(baseUrl, DEFAULT_GEMINI_BASE_URL);
-  if (!trimmed) return '';
-  if (/\/(?:v1beta\/)?decisions$/i.test(trimmed)) {
-    return trimmed;
-  }
-  if (/\/v1beta$/i.test(trimmed)) {
-    return `${trimmed}/decisions`;
-  }
-  return `${trimmed}/v1beta/decisions`;
-};
+export const buildOpenAIDecisionsEndpoint = (baseUrl: string): string =>
+  buildDecisionsEndpoint(baseUrl, 'https://api.openai.com', 'v1');
+
+export const buildGeminiDecisionsEndpoint = (baseUrl: string): string =>
+  buildDecisionsEndpoint(baseUrl, DEFAULT_GEMINI_BASE_URL, 'v1beta');
+
+/** Default probe model per decision protocol; neither is a chat model. */
+export const OPENAI_DECISIONS_PROBE_MODEL = 'gpt-6-luna-decision';
+export const GEMINI_DECISIONS_PROBE_MODEL = 'gemini-decision-1';
+
+/** OpenAI Decisions takes `questions` as an array; Gemini Decisions takes an object. */
+export const buildOpenAIDecisionsProbePayload = (model: string): string =>
+  JSON.stringify({
+    model,
+    input: 'ping',
+    questions: [{ type: 'predicate', name: 'ok', instructions: 'Reply yes.' }],
+  });
+
+export const buildGeminiDecisionsProbePayload = (model: string): string =>
+  JSON.stringify({
+    model,
+    input: 'ping',
+    questions: { ok: { type: 'noul', instructions: 'Reply yes.' } },
+  });
 
 export const buildGeminiGenerateContentEndpoint = (baseUrl: string, model: string): string => {
   const resource = buildGeminiModelResource(model);

@@ -33,9 +33,11 @@ import {
   resolveKimiBaseUrl,
 } from './kimi';
 import type {
+  GroupedKeyBrand,
   ProviderBrand,
   ProviderResource,
   ProviderResourceSelector,
+  SingleKeyBrand,
   SponsorProviderBrand,
   SponsorProviderRaw,
 } from './types';
@@ -66,17 +68,7 @@ const truncateForId = (value: string | undefined | null): string => {
 };
 
 function providerKeyToResource(
-  brand:
-    | 'gemini'
-    | 'interactions'
-    | 'decisionGemini'
-    | 'codex'
-    | 'decisionOpenAI'
-    | 'typesafe'
-    | 'meta'
-    | 'xai'
-    | 'claude'
-    | 'vertex',
+  brand: SingleKeyBrand,
   config: GeminiKeyConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {
@@ -132,8 +124,8 @@ export function interactionsToResource(config: GeminiKeyConfig, index: number): 
   return providerKeyToResource('interactions', config, index);
 }
 
-function groupedProviderKeyToResource(
-  brand: 'codex' | 'decisionOpenAI' | 'decisionGemini' | 'typesafe',
+export function groupedProviderKeyToResource(
+  brand: GroupedKeyBrand,
   config: CodexProviderGroupConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {

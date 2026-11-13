@@ -34,48 +34,28 @@ export type ProviderSortBy = (typeof PROVIDER_SORT_BY_VALUES)[number];
 export const SORT_DIR_VALUES = ['asc', 'desc'] as const;
 export type SortDir = (typeof SORT_DIR_VALUES)[number];
 
+/** Brands whose resources can exist as a single API-key entry. Grouped brands
+ *  may also surface legacy single-key resources. */
+export type SingleKeyBrand =
+  | 'gemini'
+  | 'interactions'
+  | 'decisionGemini'
+  | 'codex'
+  | 'decisionOpenAI'
+  | 'typesafe'
+  | 'meta'
+  | 'xai'
+  | 'claude'
+  | 'vertex';
+
+/** Brands backed by a multi-key credential group (api-keys.<family> groups). */
+export type GroupedKeyBrand = 'codex' | 'decisionOpenAI' | 'decisionGemini' | 'typesafe';
+
 export type ProviderResourceSelector =
-  | { brand: 'gemini'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'interactions'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'decisionGemini'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'codex'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'decisionOpenAI'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'typesafe'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'meta'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'xai'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }
-  | { brand: 'vertex'; apiKey: string; baseUrl?: string; index: number }
+  | { brand: SingleKeyBrand; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'openaiCompatibility'; name: string; index: number }
   | {
-      brand: 'apikeyFun';
-      openaiIndices: number[];
-      claudeIndices: number[];
-      codexIndices: number[];
-      geminiIndices: number[];
-    }
-  | {
-      brand: 'fennoAI';
-      openaiIndices: number[];
-      claudeIndices: number[];
-      codexIndices: number[];
-      geminiIndices: number[];
-    }
-  | {
-      brand: 'qiniuCloud';
-      openaiIndices: number[];
-      claudeIndices: number[];
-      codexIndices: number[];
-      geminiIndices: number[];
-    }
-  | {
-      brand: 'aiCodeMirror';
-      openaiIndices: number[];
-      claudeIndices: number[];
-      codexIndices: number[];
-      geminiIndices: number[];
-    }
-  | {
-      brand: 'kimi';
+      brand: SponsorProviderBrand;
       openaiIndices: number[];
       claudeIndices: number[];
       codexIndices: number[];

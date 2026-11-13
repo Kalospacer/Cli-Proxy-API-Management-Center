@@ -338,6 +338,37 @@ export const normalizeProviderGroups = (groups: unknown, openai = false) => {
   });
 };
 
+/** Normalize one raw v8 credential group (api-keys.<family>[i]) into the
+ *  grouped-key config shape shared by codex, the decision families, and
+ *  typesafe. `members` is this group's flattened key configs; `groups` is the
+ *  raw family array kept on source for writes. */
+export const normalizeProviderGroupEntry = (
+  group: unknown,
+  defaultPrefix: string,
+  groupIndex: number,
+  members: ProviderKeyConfig[] | undefined,
+  groups: unknown[]
+): CodexProviderGroupConfig | null => {
+  if (!isRecord(group) || !Array.isArray(group.keys)) return null;
+  const normalized = normalizeOpenAIProvider(
+    { ...group, name: group.name || `${defaultPrefix}-${groupIndex + 1}` },
+    groupIndex,
+    true
+  );
+  if (!normalized) return null;
+  return {
+    ...normalized,
+    proxyUrl: typeof group['proxy-url'] === 'string' ? group['proxy-url'] : undefined,
+    excludedModels: normalizeExcludedModels(group['excluded-models']),
+    usageApiKeyEntries: normalized.apiKeyEntries.filter(
+      (entry, index, entries) =>
+        entries.findIndex((candidate) => candidate.apiKey === entry.apiKey) === index
+    ),
+    source: { groupIndex, group, groups },
+    members: members ?? [],
+  };
+};
+
 export const normalizeConfigResponse = (raw: unknown): Config => {
   const config: Config = { raw: isRecord(raw) ? raw : {} };
   if (!isRecord(raw)) return config;
@@ -385,33 +416,27 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
     rawGroups: unknown,
     defaultPrefix: string,
     members: ProviderKeyConfig[] | undefined
-  ): CodexProviderGroupConfig[] =>
-    Array.isArray(rawGroups)
-      ? rawGroups.flatMap((group, groupIndex) => {
-          if (!isRecord(group) || !Array.isArray(group.keys)) return [];
-          const normalized = normalizeOpenAIProvider(
-            { ...group, name: group.name || `${defaultPrefix}-${groupIndex + 1}` },
-            groupIndex,
-            true
-          );
-          return normalized
-            ? [
-                {
-                  ...normalized,
-                  proxyUrl: typeof group['proxy-url'] === 'string' ? group['proxy-url'] : undefined,
-                  excludedModels: normalizeExcludedModels(group['excluded-models']),
-                  usageApiKeyEntries: normalized.apiKeyEntries.filter((entry, index, entries) =>
-                    entries.findIndex((candidate) => candidate.apiKey === entry.apiKey) === index
-                  ),
-                  source: { groupIndex, group, groups: rawGroups },
-                  members: (members ?? []).filter(
-                    (item) => item.source?.groupIndex === groupIndex
-                  ),
-                },
-              ]
-            : [];
-        })
-      : [];
+  ): CodexProviderGroupConfig[] => {
+    if (!Array.isArray(rawGroups)) return [];
+    const membersByGroup = new Map<number, ProviderKeyConfig[]>();
+    (members ?? []).forEach((item) => {
+      const groupIndex = item.source?.groupIndex;
+      if (groupIndex === undefined) return;
+      const list = membersByGroup.get(groupIndex) ?? [];
+      list.push(item);
+      membersByGroup.set(groupIndex, list);
+    });
+    return rawGroups.flatMap((group, groupIndex) => {
+      const entry = normalizeProviderGroupEntry(
+        group,
+        defaultPrefix,
+        groupIndex,
+        membersByGroup.get(groupIndex),
+        rawGroups
+      );
+      return entry ? [entry] : [];
+    });
+  };
   config.codexProviderGroups = normalizeGroupedKeyGroups(
     at('api-keys.codex'),
     'codex',

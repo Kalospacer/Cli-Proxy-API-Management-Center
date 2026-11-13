@@ -21,6 +21,7 @@ import { SponsorCampaignCard } from './components/SponsorCampaignCard';
 import { SponsorQuickStartPanel } from './components/SponsorQuickStartPanel';
 import { ProviderSheet, type ProviderSheetHandle } from './sheets/ProviderSheet';
 import { APIKEY_FUN_DISPLAY_NAME } from './sponsor';
+import { isGroupedKeyBrand } from './descriptors';
 import { isMultiProtocolSponsorBrand } from './sponsorDefinitions';
 import { isSponsorPartialMutationError } from './sponsorMutationRecovery';
 import { useProviderWorkbench } from './useProviderWorkbench';
@@ -91,10 +92,10 @@ const getResourceRecentSuccess = (
     return getOpenAIProviderRecentWindowStats(resource.raw as OpenAIProviderConfig, usageByProvider)
       .success;
   }
-  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+  if (isGroupedKeyBrand(resource.brand) && !resource.flags.singleCodex) {
     const group = resource.raw as CodexProviderGroupConfig;
     return getOpenAIProviderRecentWindowStats(
-      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      { ...group, name: getProviderUsageKey(resource.brand), apiKeyEntries: group.usageApiKeyEntries },
       usageByProvider
     ).success;
   }

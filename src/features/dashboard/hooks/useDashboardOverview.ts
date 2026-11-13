@@ -97,6 +97,7 @@ export const getProviderKeyCounts = (config: Config) => ({
   decisionGemini: config.decisionGeminiApiKeys?.length ?? 0,
   codex: config.codexApiKeys?.length ?? 0,
   decisionOpenAI: config.decisionOpenAIApiKeys?.length ?? 0,
+  typesafe: config.typesafeApiKeys?.length ?? 0,
   meta: config.metaApiKeys?.length ?? 0,
   xai: config.xaiApiKeys?.length ?? 0,
   claude: config.claudeApiKeys?.length ?? 0,

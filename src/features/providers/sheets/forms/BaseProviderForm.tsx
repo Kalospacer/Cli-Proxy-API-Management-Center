@@ -21,7 +21,7 @@ import { hasDisableAllModelsRule } from '@/components/providers/utils';
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
 import type { CodexProviderGroupConfig } from '@/types/provider';
 import type { ModelInfo } from '@/utils/models';
-import { PROVIDER_DESCRIPTORS } from '../../descriptors';
+import { isGroupedKeyBrand, PROVIDER_DESCRIPTORS } from '../../descriptors';
 import { removeModelAt } from '../../modelEntries';
 import { syncDiscoveredModels } from '../../discoverySelection';
 import type {
@@ -87,7 +87,14 @@ function buildInitialForm(
     return {
       apiKey: '',
       name: '',
-      baseUrl: brand === 'meta' ? META_API_BASE_URL : brand === 'xai' ? XAI_API_BASE_URL : '',
+      baseUrl:
+        brand === 'meta'
+          ? META_API_BASE_URL
+          : brand === 'xai'
+            ? XAI_API_BASE_URL
+            : brand === 'typesafe'
+              ? 'https://api.typesafe.ai'
+              : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,
@@ -116,21 +123,23 @@ function buildInitialForm(
           ? ''
           : undefined,
       apiKeyEntries:
-        brand === 'openaiCompatibility' || brand === 'codex' ? [emptyApiKeyEntry()] : undefined,
+        brand === 'openaiCompatibility' || isGroupedKeyBrand(brand)
+          ? [emptyApiKeyEntry()]
+          : undefined,
     };
   }
 
   const raw = resource.raw;
-  if (brand === 'openaiCompatibility' || (brand === 'codex' && !resource.flags.singleCodex)) {
+  if (brand === 'openaiCompatibility' || (isGroupedKeyBrand(brand) && !resource.flags.singleCodex)) {
     const cfg = raw as OpenAIProviderConfig;
-    const codex = brand === 'codex' ? (raw as CodexProviderGroupConfig) : undefined;
+    const grouped = isGroupedKeyBrand(brand) ? (raw as CodexProviderGroupConfig) : undefined;
     return {
       apiKey: '',
       name: cfg.name ?? '',
       baseUrl: cfg.baseUrl ?? '',
-      proxyUrl: codex?.proxyUrl ?? '',
+      proxyUrl: grouped?.proxyUrl ?? '',
       prefix: cfg.prefix ?? '',
-      disabled: brand === 'codex' ? resource.disabled : cfg.disabled === true,
+      disabled: isGroupedKeyBrand(brand) ? resource.disabled : cfg.disabled === true,
       disableCooling: cfg.disableCooling,
       runtimePolicy: readRuntimePolicy(cfg),
       ...pickProviderBehavior(cfg, brand),
@@ -149,8 +158,8 @@ function buildInitialForm(
       headers: cfg.headers
         ? Object.entries(cfg.headers).map(([k, v]) => ({ key: k, value: String(v) }))
         : [emptyHeader()],
-      excludedModelsText: stripDisableAllRule(codex?.excludedModels).join('\n'),
-      testModel: '',
+      excludedModelsText: stripDisableAllRule(grouped?.excludedModels).join('\n'),
+      testModel: brand === 'typesafe' ? undefined : '',
       apiKeyEntries: cfg.apiKeyEntries?.length
         ? cfg.apiKeyEntries.map((entry) => ({
             apiKey: '',
@@ -401,6 +410,16 @@ export function BaseProviderForm({
     if (descriptor.supportsApiKey && mode === 'create' && !form.apiKey.trim()) {
       return t('providersPage.form.validation.apiKeyRequired');
     }
+    if (
+      !descriptor.supportsApiKey &&
+      descriptor.supportsApiKeyEntries &&
+      mode === 'create' &&
+      !(form.apiKeyEntries ?? []).some(
+        (entry) => entry.apiKey.trim() || entry.existingApiKey?.trim()
+      )
+    ) {
+      return t('providersPage.form.validation.apiKeyRequired');
+    }
     if (descriptor.baseUrlRequired && !form.baseUrl.trim()) {
       return t('providersPage.form.validation.baseUrlRequired');
     }
@@ -484,13 +503,17 @@ export function BaseProviderForm({
   const actualApiKeyEntries = form.apiKeyEntries ?? [];
   const supportsModelImage = brand === 'openaiCompatibility';
   const singleConnectivity =
-    brand === 'codex' || brand === 'decisionOpenAI' || brand === 'meta' || brand === 'xai'
+    brand === 'meta' || brand === 'xai' || (brand === 'codex' && resource?.flags.singleCodex)
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
-      : brand === 'gemini' || brand === 'interactions' || brand === 'decisionGemini'
-        ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
-        : isClaudeLikeBrand(brand)
-          ? { status: connectivity.claudeStatus, run: connectivity.runClaude }
-          : null;
+      : brand === 'decisionOpenAI' && resource?.flags.singleCodex
+        ? { status: connectivity.codexStatus, run: connectivity.runCodex }
+        : brand === 'gemini' ||
+            brand === 'interactions' ||
+            (brand === 'decisionGemini' && resource?.flags.singleCodex)
+          ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
+          : isClaudeLikeBrand(brand)
+            ? { status: connectivity.claudeStatus, run: connectivity.runClaude }
+            : null;
 
   const updateModelEntry = (idx: number, patch: Partial<ModelEntryInput>) => {
     updateField(
@@ -745,7 +768,7 @@ export function BaseProviderForm({
         ) : null}
       </div>
 
-      {brand !== 'codex' || resource?.flags.singleCodex ? (
+      {!isGroupedKeyBrand(brand) || resource?.flags.singleCodex ? (
         <ProviderBehaviorEditor
           brand={brand}
           value={form}
@@ -771,6 +794,7 @@ export function BaseProviderForm({
         >
           <ApiKeyEntriesEditor
             entries={apiKeyEntries}
+            allowTesting={brand !== 'typesafe'}
             removeDisabled={actualApiKeyEntries.length === 0}
             mutating={mutating}
             statuses={connectivity.openaiStatuses}

@@ -29,6 +29,7 @@ import type { OpenAIProviderConfig } from '@/types';
 import type { CodexProviderGroupConfig } from '@/types/provider';
 import type { StatusBarData } from '@/utils/recentRequests';
 import type { ProviderResource } from '../types';
+import { isGroupedKeyBrand } from '../descriptors';
 import { isMultiProtocolSponsorBrand } from '../sponsorDefinitions';
 import styles from './ProviderResourceTable.module.scss';
 import statusBarStyles from './providerStatusBar.module.scss';
@@ -56,10 +57,10 @@ const resolveStatusBarData = (
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderRecentStatusData(resource.raw as OpenAIProviderConfig, usageByProvider);
   }
-  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+  if (isGroupedKeyBrand(resource.brand) && !resource.flags.singleCodex) {
     const group = resource.raw as CodexProviderGroupConfig;
     return getOpenAIProviderRecentStatusData(
-      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      { ...group, name: getProviderUsageKey(resource.brand), apiKeyEntries: group.usageApiKeyEntries },
       usageByProvider
     );
   }
@@ -78,10 +79,10 @@ const resolveTotalStats = (
   if (resource.brand === 'openaiCompatibility') {
     return getOpenAIProviderTotalStats(resource.raw as OpenAIProviderConfig, usageByProvider);
   }
-  if (resource.brand === 'codex' && !resource.flags.singleCodex) {
+  if (isGroupedKeyBrand(resource.brand) && !resource.flags.singleCodex) {
     const group = resource.raw as CodexProviderGroupConfig;
     return getOpenAIProviderTotalStats(
-      { ...group, name: 'codex', apiKeyEntries: group.usageApiKeyEntries },
+      { ...group, name: getProviderUsageKey(resource.brand), apiKeyEntries: group.usageApiKeyEntries },
       usageByProvider
     );
   }
@@ -131,7 +132,7 @@ export function ProviderResourceTable({
       });
       return <div className={styles.metricsCell}>{items}</div>;
     }
-    if (r.brand === 'openaiCompatibility' || r.brand === 'codex') {
+    if (r.brand === 'openaiCompatibility' || isGroupedKeyBrand(r.brand)) {
       items.push(
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
         renderMetric('keys', t('providersPage.table.metrics.keys'), r.apiKeyEntryCount),
@@ -199,7 +200,7 @@ export function ProviderResourceTable({
         </div>
       );
     }
-    if (r.brand === 'openaiCompatibility' || r.brand === 'codex') {
+    if (r.brand === 'openaiCompatibility' || isGroupedKeyBrand(r.brand)) {
       const extra = r.apiKeyEntryCount > 1 ? ` · +${r.apiKeyEntryCount - 1}` : '';
       return (
         <div className={styles.primaryCell}>

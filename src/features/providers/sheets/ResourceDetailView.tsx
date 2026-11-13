@@ -1,10 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/ui/Collapsible';
 import { IconCheck, IconX } from '@/components/ui/icons';
-import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
-import type { OpenAIProviderConfig } from '@/types';
+import { getProviderTotalStats, getProviderUsageKey, type ProviderRecentUsageMap } from '@/components/providers/utils';
+import type { OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
 import type { CodexProviderGroupConfig } from '@/types/provider';
-import { codexToResource } from '../adapters';
+import {
+  codexToResource,
+  decisionGeminiToResource,
+  decisionOpenAIToResource,
+  typesafeToResource,
+} from '../adapters';
+import { isGroupedKeyBrand } from '../descriptors';
 import { maskApiKey } from '@/utils/format';
 import {
   getSponsorProviderDefinition,
@@ -120,11 +126,18 @@ export function ResourceDetailView({ resource, usageByProvider, onEditKey, mutat
     ['apiKeyEntries', String(resource.apiKeyEntryCount)],
   ];
 
+  const isGroupedBrand = isGroupedKeyBrand(resource.brand) && !resource.flags.singleCodex;
   const openaiConfig =
-    resource.brand === 'openaiCompatibility' || resource.brand === 'codex'
+    resource.brand === 'openaiCompatibility' || isGroupedBrand
       ? (resource.raw as OpenAIProviderConfig)
       : null;
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
+  const memberToResource = (member: ProviderKeyConfig, idx: number): ProviderResource => {
+    if (resource.brand === 'decisionOpenAI') return decisionOpenAIToResource(member, idx);
+    if (resource.brand === 'decisionGemini') return decisionGeminiToResource(member, idx);
+    if (resource.brand === 'typesafe') return typesafeToResource(member, idx);
+    return codexToResource(member, idx);
+  };
 
   return (
     <div>
@@ -148,17 +161,17 @@ export function ResourceDetailView({ resource, usageByProvider, onEditKey, mutat
           </div>
           <div className={styles.apiKeyEntryList}>
             {apiKeyEntries.map((entry, entryIndex) => {
-              const member = resource.brand === 'codex'
+              const member = isGroupedBrand
                 ? (resource.raw as CodexProviderGroupConfig).members.find(
                     (item) => item.source?.keyIndex === entry.sourceIndex
                   )
                 : undefined;
-              const ambiguousStats = resource.brand === 'codex' &&
+              const ambiguousStats = isGroupedBrand &&
                 apiKeyEntries.some((other, index) => index !== entryIndex && other.apiKey === entry.apiKey);
               const entryStats = usageByProvider && !ambiguousStats
                 ? getProviderTotalStats(
                     usageByProvider,
-                    resource.brand === 'codex' ? 'codex' : openaiConfig.name,
+                    isGroupedBrand ? getProviderUsageKey(resource.brand) : openaiConfig.name,
                     entry.apiKey,
                     openaiConfig.baseUrl
                   )
@@ -172,7 +185,7 @@ export function ResourceDetailView({ resource, usageByProvider, onEditKey, mutat
                       type="button"
                       className={styles.connectivityBtnGhost}
                       disabled={mutationDisabled}
-                      onClick={() => onEditKey(codexToResource(member, entryIndex))}
+                      onClick={() => onEditKey(memberToResource(member, entryIndex))}
                     >
                       {t('providersPage.actions.edit')}
                     </button>

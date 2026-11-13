@@ -24,6 +24,7 @@ export const ROUTING_KEY_FAMILIES = [
   'decision-gemini',
   'codex',
   'decision-openai',
+  'typesafe',
   'meta',
   'xai',
   'claude',

@@ -122,6 +122,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         case 'decision-openai-api-key':
           nextConfig.decisionOpenAIApiKeys = value as Config['decisionOpenAIApiKeys'];
           break;
+        case 'typesafe-api-key':
+          nextConfig.typesafeApiKeys = value as Config['typesafeApiKeys'];
+          break;
         case 'meta-api-key':
           nextConfig.metaApiKeys = value as Config['metaApiKeys'];
           break;

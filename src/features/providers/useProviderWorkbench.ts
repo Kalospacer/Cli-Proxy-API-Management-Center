@@ -30,10 +30,11 @@ import {
   qiniuCloudToResource,
   aiCodeMirrorToResource,
   kimiToResource,
+  typesafeToResource,
   vertexToResource,
   xaiToResource,
 } from './adapters';
-import { PROVIDER_BRAND_ORDER, PROVIDER_DESCRIPTORS } from './descriptors';
+import { isGroupedKeyBrand, PROVIDER_BRAND_ORDER, PROVIDER_DESCRIPTORS } from './descriptors';
 import { buildRuntimePolicy } from './runtimePolicy';
 import { buildModelOptions } from './modelOptions';
 import { pickProviderBehavior } from './providerBehavior';
@@ -165,6 +166,7 @@ const buildProviderKeyConfig = (
     | 'decisionGemini'
     | 'codex'
     | 'decisionOpenAI'
+    | 'typesafe'
     | 'meta'
     | 'xai'
     | 'claude'
@@ -217,7 +219,7 @@ const buildProviderKeyConfig = (
 export const buildOpenAIConfig = (
   input: ProviderEntryFormInput,
   existing?: OpenAIProviderConfig | null,
-  brand: 'codex' | 'openaiCompatibility' = 'openaiCompatibility'
+  brand: ProviderBrand = 'openaiCompatibility'
 ): OpenAIProviderConfig => {
   const headers = headersFromEntries(input.headers);
   const models = buildModelAliases(input.models, true);
@@ -247,7 +249,7 @@ export const buildOpenAIConfig = (
     prefix: input.prefix.trim() || undefined,
     apiKeyEntries,
     disabled: input.disabled,
-    ...(brand === 'codex'
+    ...(isGroupedKeyBrand(brand)
       ? {
           proxyUrl: input.proxyUrl.trim() || undefined,
           excludedModels: buildExcludedModels(
@@ -415,13 +417,18 @@ export const buildProviderGroups = (config: Config): ProviderGroup[] =>
         );
         break;
       case 'decisionGemini':
-        resources = (config.decisionGeminiApiKeys ?? []).map((item, index) =>
-          decisionGeminiToResource(item, index)
+        resources = (config.decisionGeminiProviderGroups ?? config.decisionGeminiApiKeys ?? []).map(
+          (item, index) => decisionGeminiToResource(item, index)
         );
         break;
       case 'decisionOpenAI':
-        resources = (config.decisionOpenAIApiKeys ?? []).map((item, index) =>
-          decisionOpenAIToResource(item, index)
+        resources = (config.decisionOpenAIProviderGroups ?? config.decisionOpenAIApiKeys ?? []).map(
+          (item, index) => decisionOpenAIToResource(item, index)
+        );
+        break;
+      case 'typesafe':
+        resources = (config.typesafeProviderGroups ?? config.typesafeApiKeys ?? []).map(
+          (item, index) => typesafeToResource(item, index)
         );
         break;
       case 'codex':
@@ -737,13 +744,15 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             buildProviderKeyConfig('interactions', input) as GeminiKeyConfig
           );
         } else if (brand === 'decisionGemini') {
-          await providersApi.createDecisionGeminiConfig(
-            buildProviderKeyConfig('decisionGemini', input) as ProviderKeyConfig
+          await providersApi.createDecisionGeminiGroup(
+            buildOpenAIConfig(input, null, 'decisionGemini')
           );
         } else if (brand === 'decisionOpenAI') {
-          await providersApi.createDecisionOpenAIConfig(
-            buildProviderKeyConfig('decisionOpenAI', input) as ProviderKeyConfig
+          await providersApi.createDecisionOpenAIGroup(
+            buildOpenAIConfig(input, null, 'decisionOpenAI')
           );
+        } else if (brand === 'typesafe') {
+          await providersApi.createTypeSafeGroup(buildOpenAIConfig(input, null, 'typesafe'));
         } else if (brand === 'codex') {
           await providersApi.createCodexGroup(buildOpenAIConfig(input, null, 'codex'));
         } else if (brand === 'meta') {
@@ -802,19 +811,50 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             buildProviderKeyConfig('interactions', input, existing) as GeminiKeyConfig
           );
         } else if (brand === 'decisionGemini' && selector.brand === 'decisionGemini') {
-          const existing = resource.raw as ProviderKeyConfig;
-          await providersApi.updateDecisionGeminiConfig(
-            selector.apiKey,
-            selector.baseUrl,
-            buildProviderKeyConfig('decisionGemini', input, existing) as ProviderKeyConfig
-          );
+          if (resource.flags.singleCodex) {
+            const existing = resource.raw as ProviderKeyConfig;
+            await providersApi.updateDecisionGeminiConfig(
+              selector.apiKey,
+              selector.baseUrl,
+              buildProviderKeyConfig('decisionGemini', input, existing) as ProviderKeyConfig
+            );
+          } else {
+            const existing = resource.raw as OpenAIProviderConfig;
+            await providersApi.updateDecisionGeminiGroup(
+              buildOpenAIConfig(input, existing, 'decisionGemini'),
+              input.disabled !== resource.disabled ? input.disabled : undefined
+            );
+          }
         } else if (brand === 'decisionOpenAI' && selector.brand === 'decisionOpenAI') {
-          const existing = resource.raw as ProviderKeyConfig;
-          await providersApi.updateDecisionOpenAIConfig(
-            selector.apiKey,
-            selector.baseUrl,
-            buildProviderKeyConfig('decisionOpenAI', input, existing) as ProviderKeyConfig
-          );
+          if (resource.flags.singleCodex) {
+            const existing = resource.raw as ProviderKeyConfig;
+            await providersApi.updateDecisionOpenAIConfig(
+              selector.apiKey,
+              selector.baseUrl,
+              buildProviderKeyConfig('decisionOpenAI', input, existing) as ProviderKeyConfig
+            );
+          } else {
+            const existing = resource.raw as OpenAIProviderConfig;
+            await providersApi.updateDecisionOpenAIGroup(
+              buildOpenAIConfig(input, existing, 'decisionOpenAI'),
+              input.disabled !== resource.disabled ? input.disabled : undefined
+            );
+          }
+        } else if (brand === 'typesafe' && selector.brand === 'typesafe') {
+          if (resource.flags.singleCodex) {
+            const existing = resource.raw as ProviderKeyConfig;
+            await providersApi.updateTypeSafeConfig(
+              selector.apiKey,
+              selector.baseUrl,
+              buildProviderKeyConfig('typesafe', input, existing) as ProviderKeyConfig
+            );
+          } else {
+            const existing = resource.raw as OpenAIProviderConfig;
+            await providersApi.updateTypeSafeGroup(
+              buildOpenAIConfig(input, existing, 'typesafe'),
+              input.disabled !== resource.disabled ? input.disabled : undefined
+            );
+          }
         } else if (brand === 'codex' && selector.brand === 'codex') {
           if (resource.flags.singleCodex) {
             const existing = resource.raw as ProviderKeyConfig;
@@ -903,21 +943,39 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
           const next = (config?.interactionsApiKeys ?? []).filter((_, i) => i !== sel.index);
           updateConfigValue('interactions-api-key', next);
         } else if (sel.brand === 'decisionGemini') {
-          await providersApi.deleteDecisionGeminiConfig(
-            sel.apiKey,
-            sel.baseUrl,
-            (resource.raw as ProviderKeyConfig).source
-          );
-          const next = (config?.decisionGeminiApiKeys ?? []).filter((_, i) => i !== sel.index);
-          updateConfigValue('decision-gemini-api-key', next);
+          if (resource.flags.singleCodex) {
+            await providersApi.deleteDecisionGeminiConfig(
+              sel.apiKey,
+              sel.baseUrl,
+              (resource.raw as ProviderKeyConfig).source
+            );
+          } else {
+            await providersApi.deleteDecisionGeminiGroup(
+              (resource.raw as OpenAIProviderConfig).source
+            );
+          }
         } else if (sel.brand === 'decisionOpenAI') {
-          await providersApi.deleteDecisionOpenAIConfig(
-            sel.apiKey,
-            sel.baseUrl,
-            (resource.raw as ProviderKeyConfig).source
-          );
-          const next = (config?.decisionOpenAIApiKeys ?? []).filter((_, i) => i !== sel.index);
-          updateConfigValue('decision-openai-api-key', next);
+          if (resource.flags.singleCodex) {
+            await providersApi.deleteDecisionOpenAIConfig(
+              sel.apiKey,
+              sel.baseUrl,
+              (resource.raw as ProviderKeyConfig).source
+            );
+          } else {
+            await providersApi.deleteDecisionOpenAIGroup(
+              (resource.raw as OpenAIProviderConfig).source
+            );
+          }
+        } else if (sel.brand === 'typesafe') {
+          if (resource.flags.singleCodex) {
+            await providersApi.deleteTypeSafeConfig(
+              sel.apiKey,
+              sel.baseUrl,
+              (resource.raw as ProviderKeyConfig).source
+            );
+          } else {
+            await providersApi.deleteTypeSafeGroup((resource.raw as OpenAIProviderConfig).source);
+          }
         } else if (sel.brand === 'codex') {
           if (resource.flags.singleCodex) {
             await providersApi.deleteCodexConfig(
@@ -1042,12 +1100,22 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             ...current,
             excludedModels: excluded,
           });
-        } else if (brand === 'codex' && selector.brand === 'codex' && !resource.flags.singleCodex) {
-          await providersApi.updateCodexGroup(resource.raw as OpenAIProviderConfig, disabled);
+        } else if (isGroupedKeyBrand(brand) && selector.brand === brand && !resource.flags.singleCodex) {
+          const groupRaw = resource.raw as OpenAIProviderConfig;
+          if (brand === 'codex') {
+            await providersApi.updateCodexGroup(groupRaw, disabled);
+          } else if (brand === 'decisionOpenAI') {
+            await providersApi.updateDecisionOpenAIGroup(groupRaw, disabled);
+          } else if (brand === 'decisionGemini') {
+            await providersApi.updateDecisionGeminiGroup(groupRaw, disabled);
+          } else if (brand === 'typesafe') {
+            await providersApi.updateTypeSafeGroup(groupRaw, disabled);
+          }
         } else if (
           (brand === 'codex' && selector.brand === 'codex') ||
           (brand === 'decisionOpenAI' && selector.brand === 'decisionOpenAI') ||
           (brand === 'decisionGemini' && selector.brand === 'decisionGemini') ||
+          (brand === 'typesafe' && selector.brand === 'typesafe') ||
           (brand === 'meta' && selector.brand === 'meta') ||
           (brand === 'xai' && selector.brand === 'xai') ||
           (brand === 'claude' && selector.brand === 'claude') ||
@@ -1064,6 +1132,8 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
             await providersApi.updateDecisionOpenAIConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'decisionGemini') {
             await providersApi.updateDecisionGeminiConfig(selector.apiKey, selector.baseUrl, next);
+          } else if (selector.brand === 'typesafe') {
+            await providersApi.updateTypeSafeConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'meta') {
             await providersApi.updateMetaConfig(selector.apiKey, selector.baseUrl, next);
           } else if (selector.brand === 'xai') {

@@ -24,6 +24,7 @@ const isBlankEntry = (entry: ApiKeyEntryInput): boolean =>
 
 interface ApiKeyEntriesEditorProps {
   entries: ApiKeyEntryInput[];
+  allowTesting?: boolean;
   removeDisabled: boolean;
   mutating: boolean;
   statuses: ConnectivityStatus[];
@@ -38,6 +39,7 @@ interface ApiKeyEntriesEditorProps {
 
 export function ApiKeyEntriesEditor({
   entries,
+  allowTesting = true,
   removeDisabled,
   mutating,
   statuses,
@@ -103,19 +105,21 @@ export function ApiKeyEntriesEditor({
           <IconPlus size={12} />
           <span>{t('providersPage.form.addApiKeyEntry')}</span>
         </button>
-        <button
-          type="button"
-          className={styles.connectivityBtn}
-          disabled={mutating || isTestingAny}
-          onClick={onTestAll}
-        >
-          {isTestingAny ? (
-            <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-              <IconLoader2 size={14} />
-            </span>
-          ) : null}
-          <span>{t('providersPage.connectivity.testAll')}</span>
-        </button>
+        {allowTesting ? (
+          <button
+            type="button"
+            className={styles.connectivityBtn}
+            disabled={mutating || isTestingAny}
+            onClick={onTestAll}
+          >
+            {isTestingAny ? (
+              <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
+                <IconLoader2 size={14} />
+              </span>
+            ) : null}
+            <span>{t('providersPage.connectivity.testAll')}</span>
+          </button>
+        ) : null}
       </div>
       {visible.map(({ entry, idx }) => {
         const status = statuses[idx] ?? idleStatus;
@@ -144,19 +148,21 @@ export function ApiKeyEntriesEditor({
               </button>
               <div className={styles.entryCardHeaderRight}>
                 <ConnectivityStatusIcon state={status.state} />
-                <button
-                  type="button"
-                  className={styles.connectivityBtnGhost}
-                  disabled={mutating || status.state === 'loading'}
-                  onClick={() => onTest(idx)}
-                >
-                  {status.state === 'loading' ? (
-                    <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-                      <IconLoader2 size={14} />
-                    </span>
-                  ) : null}
-                  <span>{t('providersPage.connectivity.test')}</span>
-                </button>
+                {allowTesting ? (
+                  <button
+                    type="button"
+                    className={styles.connectivityBtnGhost}
+                    disabled={mutating || status.state === 'loading'}
+                    onClick={() => onTest(idx)}
+                  >
+                    {status.state === 'loading' ? (
+                      <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
+                        <IconLoader2 size={14} />
+                      </span>
+                    ) : null}
+                    <span>{t('providersPage.connectivity.test')}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.entryCardIconBtn}

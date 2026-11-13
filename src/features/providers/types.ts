@@ -11,13 +11,14 @@ import type { ProviderBehaviorOptions } from '@/types/provider';
 export type ProviderBrand =
   | 'gemini'
   | 'interactions'
-  | 'decisionGemini'
   | 'codex'
-  | 'decisionOpenAI'
   | 'meta'
   | 'xai'
   | 'claude'
   | 'vertex'
+  | 'decisionOpenAI'
+  | 'decisionGemini'
+  | 'typesafe'
   | 'openaiCompatibility'
   | 'apikeyFun'
   | 'fennoAI'
@@ -39,6 +40,7 @@ export type ProviderResourceSelector =
   | { brand: 'decisionGemini'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'codex'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'decisionOpenAI'; apiKey: string; baseUrl?: string; index: number }
+  | { brand: 'typesafe'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'meta'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'xai'; apiKey: string; baseUrl?: string; index: number }
   | { brand: 'claude'; apiKey: string; baseUrl?: string; index: number }

@@ -6,6 +6,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   'gemini-interactions': 'Interactions API',
   'decision-gemini': 'Gemini Decisions',
   'decision-openai': 'OpenAI Decisions',
+  typesafe: 'TypeSafe',
   aistudio: 'AI Studio',
   codex: 'Codex',
   claude: 'Claude',

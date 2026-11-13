@@ -1,6 +1,7 @@
 import type {
   ApiKeyEntry,
   CloakConfig,
+  CodexProviderGroupConfig,
   GeminiKeyConfig,
   ModelAlias,
   OpenAIProviderConfig,
@@ -376,32 +377,61 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
   config.decisionOpenAIApiKeys = normalizeProviderGroups(
     at('api-keys.decision-openai')
   ) as ProviderKeyConfig[];
+  config.typesafeApiKeys = normalizeProviderGroups(
+    at('api-keys.typesafe')
+  ) as ProviderKeyConfig[];
   config.codexApiKeys = normalizeProviderGroups(at('api-keys.codex')) as ProviderKeyConfig[];
-  const codexGroups = at('api-keys.codex');
-  config.codexProviderGroups = Array.isArray(codexGroups)
-    ? codexGroups.flatMap((group, groupIndex) => {
-        if (!isRecord(group) || !Array.isArray(group.keys)) return [];
-        const normalized = normalizeOpenAIProvider(
-          { ...group, name: group.name || `codex-${groupIndex + 1}` },
-          groupIndex,
-          true
-        );
-        return normalized
-          ? [{
-              ...normalized,
-              proxyUrl: typeof group['proxy-url'] === 'string' ? group['proxy-url'] : undefined,
-              excludedModels: normalizeExcludedModels(group['excluded-models']),
-              usageApiKeyEntries: normalized.apiKeyEntries.filter((entry, index, entries) =>
-                entries.findIndex((candidate) => candidate.apiKey === entry.apiKey) === index
-              ),
-              source: { groupIndex, group, groups: codexGroups },
-              members: (config.codexApiKeys ?? []).filter(
-                (item) => item.source?.groupIndex === groupIndex
-              ),
-            }]
-          : [];
-      })
-    : [];
+  const normalizeGroupedKeyGroups = (
+    rawGroups: unknown,
+    defaultPrefix: string,
+    members: ProviderKeyConfig[] | undefined
+  ): CodexProviderGroupConfig[] =>
+    Array.isArray(rawGroups)
+      ? rawGroups.flatMap((group, groupIndex) => {
+          if (!isRecord(group) || !Array.isArray(group.keys)) return [];
+          const normalized = normalizeOpenAIProvider(
+            { ...group, name: group.name || `${defaultPrefix}-${groupIndex + 1}` },
+            groupIndex,
+            true
+          );
+          return normalized
+            ? [
+                {
+                  ...normalized,
+                  proxyUrl: typeof group['proxy-url'] === 'string' ? group['proxy-url'] : undefined,
+                  excludedModels: normalizeExcludedModels(group['excluded-models']),
+                  usageApiKeyEntries: normalized.apiKeyEntries.filter((entry, index, entries) =>
+                    entries.findIndex((candidate) => candidate.apiKey === entry.apiKey) === index
+                  ),
+                  source: { groupIndex, group, groups: rawGroups },
+                  members: (members ?? []).filter(
+                    (item) => item.source?.groupIndex === groupIndex
+                  ),
+                },
+              ]
+            : [];
+        })
+      : [];
+  config.codexProviderGroups = normalizeGroupedKeyGroups(
+    at('api-keys.codex'),
+    'codex',
+    config.codexApiKeys
+  );
+  config.decisionOpenAIProviderGroups = normalizeGroupedKeyGroups(
+    at('api-keys.decision-openai'),
+    'decision-openai',
+    config.decisionOpenAIApiKeys
+  );
+  config.decisionGeminiProviderGroups = normalizeGroupedKeyGroups(
+    at('api-keys.decision-gemini'),
+    'decision-gemini',
+    config.decisionGeminiApiKeys
+  );
+  config.typesafeProviderGroups = normalizeGroupedKeyGroups(
+    at('api-keys.typesafe'),
+    'typesafe',
+    config.typesafeApiKeys
+  );
   config.metaApiKeys = normalizeProviderGroups(at('api-keys.meta')) as ProviderKeyConfig[];
   config.xaiApiKeys = normalizeProviderGroups(at('api-keys.xai')) as ProviderKeyConfig[];
   config.claudeApiKeys = normalizeProviderGroups(at('api-keys.claude')) as ProviderKeyConfig[];

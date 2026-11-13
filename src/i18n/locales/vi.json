@@ -1992,6 +1992,7 @@
       "decisionGemini": "Gemini Decisions",
       "codex": "Codex",
       "decisionOpenAI": "OpenAI Decisions",
+      "typesafe": "TypeSafe",
       "xai": "xAI",
       "claude": "Claude",
       "claudeApi": "ClaudeAPI",

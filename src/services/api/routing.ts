@@ -36,6 +36,7 @@ const KEY_FAMILY_CHANNELS: Record<RoutingKeyFamily, string> = {
   'decision-gemini': 'decision-gemini',
   codex: 'codex',
   'decision-openai': 'decision-openai',
+  typesafe: 'typesafe',
   meta: 'meta',
   xai: 'xai',
   claude: 'claude',

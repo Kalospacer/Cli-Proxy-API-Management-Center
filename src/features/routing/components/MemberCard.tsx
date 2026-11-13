@@ -15,6 +15,7 @@ const FAMILY_BRANDS: Record<string, ProviderBrand> = {
   'decision-gemini': 'decisionGemini',
   codex: 'codex',
   'decision-openai': 'decisionOpenAI',
+  typesafe: 'typesafe',
   meta: 'meta',
   xai: 'xai',
   claude: 'claude',

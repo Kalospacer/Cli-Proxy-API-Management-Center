@@ -33,6 +33,7 @@ export const PROVIDER_LOGOS: Record<ProviderBrandLogoKey, ProviderBrandLogo> = {
   decisionGemini: { src: geminiLogo },
   claude: { src: claudeLogo },
   codex: { src: codexLogo },
+  typesafe: { src: codexLogo },
   decisionOpenAI: { src: openaiLightLogo, darkSrc: openaiDarkLogo, transparent: true },
   meta: { src: metaLogo, transparent: true },
   devin: { src: devinLightLogo, darkSrc: devinDarkLogo, transparent: true },

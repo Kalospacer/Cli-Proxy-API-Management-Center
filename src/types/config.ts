@@ -24,10 +24,14 @@ export interface Config {
   apiKeys?: string[];
   geminiApiKeys?: GeminiKeyConfig[];
   interactionsApiKeys?: GeminiKeyConfig[];
-  decisionGeminiApiKeys?: ProviderKeyConfig[];
   codexApiKeys?: ProviderKeyConfig[];
   decisionOpenAIApiKeys?: ProviderKeyConfig[];
+  decisionGeminiApiKeys?: ProviderKeyConfig[];
+  typesafeApiKeys?: ProviderKeyConfig[];
   codexProviderGroups?: CodexProviderGroupConfig[];
+  decisionOpenAIProviderGroups?: CodexProviderGroupConfig[];
+  decisionGeminiProviderGroups?: CodexProviderGroupConfig[];
+  typesafeProviderGroups?: CodexProviderGroupConfig[];
   metaApiKeys?: ProviderKeyConfig[];
   xaiApiKeys?: ProviderKeyConfig[];
   claudeApiKeys?: ProviderKeyConfig[];
@@ -54,6 +58,7 @@ export type RawConfigSection =
   | 'decision-gemini-api-key'
   | 'codex-api-key'
   | 'decision-openai-api-key'
+  | 'typesafe-api-key'
   | 'meta-api-key'
   | 'xai-api-key'
   | 'claude-api-key'

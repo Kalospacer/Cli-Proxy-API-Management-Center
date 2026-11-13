@@ -72,6 +72,7 @@ function providerKeyToResource(
     | 'decisionGemini'
     | 'codex'
     | 'decisionOpenAI'
+    | 'typesafe'
     | 'meta'
     | 'xai'
     | 'claude'
@@ -131,26 +132,13 @@ export function interactionsToResource(config: GeminiKeyConfig, index: number): 
   return providerKeyToResource('interactions', config, index);
 }
 
-export function decisionGeminiToResource(
-  config: ProviderKeyConfig,
-  index: number
-): ProviderResource {
-  return providerKeyToResource('decisionGemini', config, index);
-}
-
-export function decisionOpenAIToResource(
-  config: ProviderKeyConfig,
-  index: number
-): ProviderResource {
-  return providerKeyToResource('decisionOpenAI', config, index);
-}
-
-export function codexToResource(
+function groupedProviderKeyToResource(
+  brand: 'codex' | 'decisionOpenAI' | 'decisionGemini' | 'typesafe',
   config: CodexProviderGroupConfig | ProviderKeyConfig,
   index: number
 ): ProviderResource {
   if (!('members' in config)) {
-    const resource = providerKeyToResource('codex', config, index);
+    const resource = providerKeyToResource(brand, config, index);
     return { ...resource, flags: { ...resource.flags, singleCodex: true } };
   }
   const resource = openaiToResource(config, index);
@@ -159,15 +147,43 @@ export function codexToResource(
   ).length;
   return {
     ...resource,
-    id: buildId('codex', config.source?.groupIndex ?? index, truncateForId(config.name)),
-    brand: 'codex',
+    id: buildId(brand, config.source?.groupIndex ?? index, truncateForId(config.name)),
+    brand,
     disabled: config.members.length > 0 && disabledCount === config.members.length,
     flags: {
       emptyCodex: config.members.length === 0,
       mixedDisabled: disabledCount > 0 && disabledCount < config.members.length,
     },
-    selector: { brand: 'codex', apiKey: '', baseUrl: config.baseUrl, index },
+    selector: { brand, apiKey: '', baseUrl: config.baseUrl, index },
   };
+}
+
+export function codexToResource(
+  config: CodexProviderGroupConfig | ProviderKeyConfig,
+  index: number
+): ProviderResource {
+  return groupedProviderKeyToResource('codex', config, index);
+}
+
+export function decisionGeminiToResource(
+  config: CodexProviderGroupConfig | ProviderKeyConfig,
+  index: number
+): ProviderResource {
+  return groupedProviderKeyToResource('decisionGemini', config, index);
+}
+
+export function decisionOpenAIToResource(
+  config: CodexProviderGroupConfig | ProviderKeyConfig,
+  index: number
+): ProviderResource {
+  return groupedProviderKeyToResource('decisionOpenAI', config, index);
+}
+
+export function typesafeToResource(
+  config: CodexProviderGroupConfig | ProviderKeyConfig,
+  index: number
+): ProviderResource {
+  return groupedProviderKeyToResource('typesafe', config, index);
 }
 
 export function metaToResource(config: ProviderKeyConfig, index: number): ProviderResource {

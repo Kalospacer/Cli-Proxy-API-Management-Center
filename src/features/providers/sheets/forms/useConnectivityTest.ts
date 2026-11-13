@@ -187,19 +187,32 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility' && brand !== 'codex') return false;
+      if (
+        brand !== 'openaiCompatibility' &&
+        brand !== 'codex' &&
+        brand !== 'decisionOpenAI' &&
+        brand !== 'decisionGemini'
+      ) {
+        return false;
+      }
 
       const trimmedBase = baseUrl.trim();
-      if (!trimmedBase) {
+      const isDecisionBrand = brand === 'decisionOpenAI' || brand === 'decisionGemini';
+      if (!trimmedBase && !isDecisionBrand) {
         updateOpenaiStatus(idx, {
           state: 'error',
           message: messages.baseUrlRequired,
         });
         return false;
       }
-      const endpoint = brand === 'codex'
-        ? buildCodexResponsesEndpoint(trimmedBase)
-        : buildOpenAIChatCompletionsEndpoint(trimmedBase);
+      const endpoint =
+        brand === 'decisionOpenAI'
+          ? buildOpenAIDecisionsEndpoint(trimmedBase)
+          : brand === 'decisionGemini'
+            ? buildGeminiDecisionsEndpoint(trimmedBase)
+            : brand === 'codex'
+              ? buildCodexResponsesEndpoint(trimmedBase)
+              : buildOpenAIChatCompletionsEndpoint(trimmedBase);
       if (!endpoint) {
         updateOpenaiStatus(idx, {
           state: 'error',
@@ -218,7 +231,13 @@ export function useConnectivityTest(
         });
         return false;
       }
-      const model = pickModel(testModel, models);
+      const model =
+        pickModel(testModel, models) ||
+        (brand === 'decisionOpenAI'
+          ? 'gpt-6-luna-decision'
+          : brand === 'decisionGemini'
+            ? 'gemini-decision-1'
+            : '');
       if (!model) {
         updateOpenaiStatus(idx, {
           state: 'error',
@@ -231,7 +250,15 @@ export function useConnectivityTest(
         'Content-Type': 'application/json',
         ...buildHeaderObject(formHeaders),
       };
-      if (!hasHeader(headerObj, 'authorization')) {
+      if (brand === 'decisionGemini') {
+        if (!hasHeader(headerObj, 'x-goog-api-key')) {
+          if (entryKey) {
+            headerObj['x-goog-api-key'] = entryKey;
+          } else if (resolvedAuthIndex) {
+            headerObj['x-goog-api-key'] = '$TOKEN$';
+          }
+        }
+      } else if (!hasHeader(headerObj, 'authorization')) {
         if (entryKey) {
           headerObj.Authorization = `Bearer ${entryKey}`;
         } else if (resolvedAuthIndex) {
@@ -245,14 +272,34 @@ export function useConnectivityTest(
         const result = await apiCallApi.request(
           {
             authIndex: resolvedAuthIndex,
-            proxy_url: entry?.proxyUrl?.trim() || (brand === 'codex' ? proxyUrl?.trim() : undefined) || undefined,
+            proxy_url:
+              entry?.proxyUrl?.trim() ||
+              (brand === 'codex' || isDecisionBrand ? proxyUrl?.trim() : undefined) ||
+              undefined,
             method: 'POST',
             url: endpoint,
             header: headerObj,
             data: JSON.stringify(
-              brand === 'codex'
-                ? { model, input: 'Hi', stream: false }
-                : { model, messages: [{ role: 'user', content: 'Hi' }], stream: false, max_tokens: 5 }
+              brand === 'decisionOpenAI'
+                ? {
+                    model,
+                    input: 'ping',
+                    questions: [{ type: 'predicate', name: 'ok', instructions: 'Reply yes.' }],
+                  }
+                : brand === 'decisionGemini'
+                  ? {
+                      model,
+                      input: 'ping',
+                      questions: { ok: { type: 'noul', instructions: 'Reply yes.' } },
+                    }
+                  : brand === 'codex'
+                    ? { model, input: 'Hi', stream: false }
+                    : {
+                        model,
+                        messages: [{ role: 'user', content: 'Hi' }],
+                        stream: false,
+                        max_tokens: 5,
+                      }
             ),
           },
           { timeout: DEFAULT_TIMEOUT_MS }
@@ -287,7 +334,14 @@ export function useConnectivityTest(
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility' && brand !== 'codex') return;
+    if (
+      brand !== 'openaiCompatibility' &&
+      brand !== 'codex' &&
+      brand !== 'decisionOpenAI' &&
+      brand !== 'decisionGemini'
+    ) {
+      return;
+    }
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));

@@ -66,8 +66,8 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
   decisionGemini: {
     id: 'decisionGemini',
     supportsRequestScopedErrors: true,
-    supportsName: false,
-    supportsApiKey: true,
+    supportsName: true,
+    supportsApiKey: false,
     supportsDisabled: true,
     supportsBaseUrl: true,
     baseUrlRequired: false,
@@ -80,7 +80,7 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsTestModel: true,
     supportsWebsockets: false,
     supportsCloak: false,
-    supportsApiKeyEntries: false,
+    supportsApiKeyEntries: true,
     sheetSize: 'md',
   },
   codex: {
@@ -106,8 +106,8 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
   decisionOpenAI: {
     id: 'decisionOpenAI',
     supportsRequestScopedErrors: true,
-    supportsName: false,
-    supportsApiKey: true,
+    supportsName: true,
+    supportsApiKey: false,
     supportsDisabled: true,
     supportsBaseUrl: true,
     baseUrlRequired: false,
@@ -120,7 +120,27 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsTestModel: true,
     supportsWebsockets: false,
     supportsCloak: false,
-    supportsApiKeyEntries: false,
+    supportsApiKeyEntries: true,
+    sheetSize: 'md',
+  },
+  typesafe: {
+    id: 'typesafe',
+    supportsRequestScopedErrors: true,
+    supportsName: true,
+    supportsApiKey: false,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: true,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: true,
+    supportsPriority: true,
+    supportsTestModel: false,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: true,
     sheetSize: 'md',
   },
   meta: {
@@ -347,6 +367,12 @@ export const getProviderModelCapabilities = (brand: ProviderBrand): ProviderMode
   modalities: brand === 'openaiCompatibility',
 });
 
+export const isGroupedKeyBrand = (brand: ProviderBrand): boolean =>
+  brand === 'codex' ||
+  brand === 'decisionOpenAI' ||
+  brand === 'decisionGemini' ||
+  brand === 'typesafe';
+
 export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
   'kimi',
   'gemini',
@@ -358,6 +384,7 @@ export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
   'vertex',
   'decisionOpenAI',
   'decisionGemini',
+  'typesafe',
   'openaiCompatibility',
   'apikeyFun',
   'fennoAI',

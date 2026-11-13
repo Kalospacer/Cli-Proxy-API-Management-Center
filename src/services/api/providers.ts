@@ -214,6 +214,7 @@ export type ProviderFamily =
   | 'decision-gemini'
   | 'codex'
   | 'decision-openai'
+  | 'typesafe'
   | 'meta'
   | 'xai'
   | 'claude'
@@ -517,6 +518,131 @@ const findOpenAISource = (groups: Record<string, unknown>[], source?: ProviderSo
   return locateProviderGroup(groups, source);
 };
 
+type GroupedKeyFamily = 'codex' | 'decision-openai' | 'decision-gemini' | 'typesafe';
+
+const groupedFamilyConfigKey = (
+  family: GroupedKeyFamily
+):
+  | 'codexProviderGroups'
+  | 'decisionOpenAIProviderGroups'
+  | 'decisionGeminiProviderGroups'
+  | 'typesafeProviderGroups' => {
+  switch (family) {
+    case 'decision-openai':
+      return 'decisionOpenAIProviderGroups';
+    case 'decision-gemini':
+      return 'decisionGeminiProviderGroups';
+    case 'typesafe':
+      return 'typesafeProviderGroups';
+    default:
+      return 'codexProviderGroups';
+  }
+};
+
+const createKeyGroup = async (family: GroupedKeyFamily, config: OpenAIProviderConfig) => {
+  const groups = await getGroups(family);
+  const group = serializeOpenAIGroup(config);
+  const grouped = config as Partial<CodexProviderGroupConfig>;
+  if (config.models?.length) group.models = serializeModelAliases(config.models);
+  if (grouped.proxyUrl) group['proxy-url'] = grouped.proxyUrl;
+  if (grouped.excludedModels?.length) group['excluded-models'] = grouped.excludedModels;
+  if (config.disabled) {
+    group.keys = (group.keys as Record<string, unknown>[]).map((key) => ({
+      ...key,
+      'excluded-models': withDisableAllModelsRule(grouped.excludedModels),
+    }));
+  }
+  delete group.disabled;
+  delete group['support-prompt-cache-key'];
+  if (!group['base-url']) delete group['base-url'];
+  await putGroups(family, [...groups, group]);
+};
+
+const updateKeyGroup = async (
+  family: GroupedKeyFamily,
+  config: OpenAIProviderConfig,
+  disabled?: boolean
+) => {
+  const groups = await getGroups(family);
+  if (!config.source) throw conflict();
+  const index = locateProviderGroup(groups, config.source);
+  const original = normalizeConfigResponse({ 'api-keys': { [family]: [groups[index]] } })[
+    groupedFamilyConfigKey(family)
+  ]?.[0];
+  if (!original) throw conflict();
+  const before = serializeOpenAIGroup(original);
+  const after = serializeOpenAIGroup(config);
+  const grouped = config as Partial<CodexProviderGroupConfig>;
+  if (original.models?.length) before.models = serializeModelAliases(original.models);
+  if (config.models?.length) after.models = serializeModelAliases(config.models);
+  if (original.proxyUrl) before['proxy-url'] = original.proxyUrl;
+  if (grouped.proxyUrl) after['proxy-url'] = grouped.proxyUrl;
+  if (original.excludedModels?.length) before['excluded-models'] = original.excludedModels;
+  if (grouped.excludedModels?.length) after['excluded-models'] = grouped.excludedModels;
+  delete before.disabled;
+  delete after.disabled;
+  delete before['support-prompt-cache-key'];
+  delete after['support-prompt-cache-key'];
+  if (!before['base-url']) delete before['base-url'];
+  if (!after['base-url']) delete after['base-url'];
+  const next = applyProviderChanges(groups[index], before, after);
+  applyPolicyIntent(next, groups[index], config, after);
+  preserveModelMetadata(
+    next,
+    groups[index].models,
+    before.models,
+    after.models,
+    original.models,
+    config.models,
+    (models) => serializeModelAliases(models)
+  );
+  if (!equal(before.keys, after.keys)) {
+    const rawKeys = groups[index].keys as Record<string, unknown>[];
+    const used = new Set<number>();
+    next.keys = config.apiKeyEntries.map((entry) => {
+      const keyIndex = entry.sourceIndex;
+      if (keyIndex === undefined) return serializeApiKeyEntry(entry);
+      if (used.has(keyIndex) || !isRecord(rawKeys[keyIndex])) throw conflict();
+      used.add(keyIndex);
+      const old = normalizeApiKeyEntry(rawKeys[keyIndex]);
+      if (!old) throw conflict();
+      const key = applyProviderChanges(
+        rawKeys[keyIndex],
+        serializeApiKeyEntry(old),
+        serializeApiKeyEntry(entry)
+      );
+      delete key['auth-index'];
+      return key;
+    });
+  }
+  if (disabled !== undefined) {
+    const effectiveKeys = normalizeProviderGroups([next]) as ProviderKeyConfig[];
+    const keys = next.keys as Record<string, unknown>[];
+    next.keys = keys.map((key, keyIndex) => {
+      const effective = effectiveKeys.find((entry) => entry.source?.keyIndex === keyIndex);
+      if (!effective) throw conflict();
+      return {
+        ...key,
+        'excluded-models': disabled
+          ? withDisableAllModelsRule(effective.excludedModels)
+          : withoutDisableAllModelsRule(effective.excludedModels),
+      };
+    });
+  }
+  groups[index] = next;
+  await putGroups(family, groups);
+};
+
+const deleteKeyGroup = async (family: GroupedKeyFamily, source?: ProviderSource) => {
+  if (!source) throw conflict();
+  const groups = await getGroups(family);
+  const index = locateProviderGroup(groups, source);
+  await putGroups(
+    family,
+    groups.filter((_, i) => i !== index)
+  );
+};
+
 export const providersApi = {
   createGeminiKey: (config: GeminiKeyConfig) => createKey('gemini', config),
   updateGeminiKey: (apiKey: string, baseUrl: string | undefined, config: GeminiKeyConfig) =>
@@ -536,6 +662,12 @@ export const providersApi = {
   ) => updateKey('decision-gemini', apiKey, baseUrl, config),
   deleteDecisionGeminiConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
     deleteKey('decision-gemini', apiKey, baseUrl, source),
+  createDecisionGeminiGroup: (config: OpenAIProviderConfig) =>
+    createKeyGroup('decision-gemini', config),
+  updateDecisionGeminiGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
+    updateKeyGroup('decision-gemini', config, disabled),
+  deleteDecisionGeminiGroup: (source?: ProviderSource) =>
+    deleteKeyGroup('decision-gemini', source),
   createDecisionOpenAIConfig: (config: ProviderKeyConfig) => createKey('decision-openai', config),
   updateDecisionOpenAIConfig: (
     apiKey: string,
@@ -544,92 +676,25 @@ export const providersApi = {
   ) => updateKey('decision-openai', apiKey, baseUrl, config),
   deleteDecisionOpenAIConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
     deleteKey('decision-openai', apiKey, baseUrl, source),
-  async createCodexGroup(config: OpenAIProviderConfig) {
-    const groups = await getGroups('codex');
-    const group = serializeOpenAIGroup(config);
-    const codex = config as Partial<CodexProviderGroupConfig>;
-    if (config.models?.length) group.models = serializeModelAliases(config.models);
-    if (codex.proxyUrl) group['proxy-url'] = codex.proxyUrl;
-    if (codex.excludedModels?.length) group['excluded-models'] = codex.excludedModels;
-    if (config.disabled) {
-      group.keys = (group.keys as Record<string, unknown>[]).map((key) => ({
-        ...key,
-        'excluded-models': withDisableAllModelsRule(codex.excludedModels),
-      }));
-    }
-    delete group.disabled;
-    delete group['support-prompt-cache-key'];
-    if (!group['base-url']) delete group['base-url'];
-    await putGroups('codex', [...groups, group]);
-  },
-  async updateCodexGroup(config: OpenAIProviderConfig, disabled?: boolean) {
-    const groups = await getGroups('codex');
-    if (!config.source) throw conflict();
-    const index = locateProviderGroup(groups, config.source);
-    const original = normalizeConfigResponse({ 'api-keys': { codex: [groups[index]] } })
-      .codexProviderGroups?.[0];
-    if (!original) throw conflict();
-    const before = serializeOpenAIGroup(original);
-    const after = serializeOpenAIGroup(config);
-    const codex = config as Partial<CodexProviderGroupConfig>;
-    if (original.models?.length) before.models = serializeModelAliases(original.models);
-    if (config.models?.length) after.models = serializeModelAliases(config.models);
-    if (original.proxyUrl) before['proxy-url'] = original.proxyUrl;
-    if (codex.proxyUrl) after['proxy-url'] = codex.proxyUrl;
-    if (original.excludedModels?.length) before['excluded-models'] = original.excludedModels;
-    if (codex.excludedModels?.length) after['excluded-models'] = codex.excludedModels;
-    delete before.disabled;
-    delete after.disabled;
-    delete before['support-prompt-cache-key'];
-    delete after['support-prompt-cache-key'];
-    if (!before['base-url']) delete before['base-url'];
-    if (!after['base-url']) delete after['base-url'];
-    const next = applyProviderChanges(groups[index], before, after);
-    applyPolicyIntent(next, groups[index], config, after);
-    preserveModelMetadata(
-      next, groups[index].models, before.models, after.models,
-      original.models, config.models, (models) => serializeModelAliases(models)
-    );
-    if (!equal(before.keys, after.keys)) {
-      const rawKeys = groups[index].keys as Record<string, unknown>[];
-      const used = new Set<number>();
-      next.keys = config.apiKeyEntries.map((entry) => {
-        const keyIndex = entry.sourceIndex;
-        if (keyIndex === undefined) return serializeApiKeyEntry(entry);
-        if (used.has(keyIndex) || !isRecord(rawKeys[keyIndex])) throw conflict();
-        used.add(keyIndex);
-        const old = normalizeApiKeyEntry(rawKeys[keyIndex]);
-        if (!old) throw conflict();
-        const key = applyProviderChanges(
-          rawKeys[keyIndex], serializeApiKeyEntry(old), serializeApiKeyEntry(entry)
-        );
-        delete key['auth-index'];
-        return key;
-      });
-    }
-    if (disabled !== undefined) {
-      const effectiveKeys = normalizeProviderGroups([next]) as ProviderKeyConfig[];
-      const keys = next.keys as Record<string, unknown>[];
-      next.keys = keys.map((key, keyIndex) => {
-        const effective = effectiveKeys.find((entry) => entry.source?.keyIndex === keyIndex);
-        if (!effective) throw conflict();
-        return {
-          ...key,
-          'excluded-models': disabled
-            ? withDisableAllModelsRule(effective.excludedModels)
-            : withoutDisableAllModelsRule(effective.excludedModels),
-        };
-      });
-    }
-    groups[index] = next;
-    await putGroups('codex', groups);
-  },
-  async deleteCodexGroup(source?: ProviderSource) {
-    if (!source) throw conflict();
-    const groups = await getGroups('codex');
-    const index = locateProviderGroup(groups, source);
-    await putGroups('codex', groups.filter((_, i) => i !== index));
-  },
+  createDecisionOpenAIGroup: (config: OpenAIProviderConfig) =>
+    createKeyGroup('decision-openai', config),
+  updateDecisionOpenAIGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
+    updateKeyGroup('decision-openai', config, disabled),
+  deleteDecisionOpenAIGroup: (source?: ProviderSource) =>
+    deleteKeyGroup('decision-openai', source),
+  createTypeSafeConfig: (config: ProviderKeyConfig) => createKey('typesafe', config),
+  updateTypeSafeConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
+    updateKey('typesafe', apiKey, baseUrl, config),
+  deleteTypeSafeConfig: (apiKey: string, baseUrl?: string, source?: ProviderSource) =>
+    deleteKey('typesafe', apiKey, baseUrl, source),
+  createTypeSafeGroup: (config: OpenAIProviderConfig) => createKeyGroup('typesafe', config),
+  updateTypeSafeGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
+    updateKeyGroup('typesafe', config, disabled),
+  deleteTypeSafeGroup: (source?: ProviderSource) => deleteKeyGroup('typesafe', source),
+  createCodexGroup: (config: OpenAIProviderConfig) => createKeyGroup('codex', config),
+  updateCodexGroup: (config: OpenAIProviderConfig, disabled?: boolean) =>
+    updateKeyGroup('codex', config, disabled),
+  deleteCodexGroup: (source?: ProviderSource) => deleteKeyGroup('codex', source),
   createCodexConfig: (config: ProviderKeyConfig) => createKey('codex', config),
   updateCodexConfig: (apiKey: string, baseUrl: string | undefined, config: ProviderKeyConfig) =>
     updateKey('codex', apiKey, baseUrl, config),
